@@ -94,12 +94,18 @@ class CSBM:
                                                    else math.log(1-self.q)
         return likelihood
 
-    def feature_separability(self, X, y):
-        """Check (bayes) feature separability of graph X, A, y given CSBM."""
+    def feature_separability(self, X, y, ids=None):
+        """Check (bayes) feature separability of graph X, A, y given CSBM.
+        
+        Optionally only check for nodes in ids.
+        
+        Return tuple: #separable, #non-separable."""
         print(f"Feature Separability:")
         n_corr = 0
         n_wrong = 0
-        for i in range(len(y)):
+        if ids is None:
+            ids = [i for i in range(len(y))]
+        for i in ids:
             density_corr = multivariate_normal.pdf(X[i,:], 
                                                    mean=(2*y[i] - 1)*self.mu, 
                                                    cov=self.cov)
@@ -112,13 +118,17 @@ class CSBM:
                 n_wrong += 1
         print(f"n_corr: {n_corr}")
         print(f"n_wrong: {n_wrong}")
+        return n_corr, n_wrong
 
-    def structure_separability(self, A, y):
+    def structure_separability(self, A, y, ids=None):
+        """Return tuple: #separable, #non-separable."""
         # Check how much nodes are correct w.r.t. structure likelihood
         print(f"Structure Separability:")
         n_corr = 0
         n_wrong = 0
-        for i in range(len(y)):
+        if ids is None:
+            ids = [i for i in range(len(y))]
+        for i in ids:
             likelihood_corr = self.structure_loglikelihood(i, y[i], A, y)
             likelihood_wrong = self.structure_loglikelihood(i, -(y[i]-1), A, y)
             if likelihood_corr > likelihood_wrong:
@@ -127,13 +137,17 @@ class CSBM:
                 n_wrong += 1
         print(f"n_corr: {n_corr}")
         print(f"n_wrong: {n_wrong}")
+        return n_corr, n_wrong
 
-    def likelihood_separability(self, X, A, y):
+    def likelihood_separability(self, X, A, y, ids=None):
+        """Return tuple: #separable, #non-separable."""
         # Check how much nodes are correct w.r.t. likelihood
         print(f"Likelihood Separability:")
         n_corr = 0
         n_wrong = 0
-        for i in range(len(y)):
+        if ids is None:
+            ids = [i for i in range(len(y))]
+        for i in ids:
             likelihood_corr = self.loglikelihood(i, y[i], X, A, y)
             likelihood_wrong = self.loglikelihood(i, -(y[i]-1), X, A, y)
             if likelihood_corr > likelihood_wrong:
@@ -142,13 +156,14 @@ class CSBM:
                 n_wrong += 1
         print(f"n_corr: {n_corr}")
         print(f"n_wrong: {n_wrong}")
+        return n_corr, n_wrong
 
     def check_separabilities(self, X, A, y, ids=None):
         """Check separability of graph X,A,y. 
         
         Optionally only check for nodes in ids."""
-        self.feature_separability(X, y)
-        self.structure_separability(A, y)
-        self.likelihood_separability(X, A, y)
+        self.feature_separability(X, y, ids)
+        self.structure_separability(A, y, ids)
+        self.likelihood_separability(X, A, y, ids)
 
        
