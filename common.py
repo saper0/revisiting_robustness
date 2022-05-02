@@ -143,7 +143,10 @@ class CSBM:
         print(f"n_corr: {n_corr}")
         print(f"n_wrong: {n_wrong}")
 
-    def check_separabilities(self, X, A, y):
+    def check_separabilities(self, X, A, y, ids=None):
+        """Check separability of graph X,A,y. 
+        
+        Optionally only check for nodes in ids."""
         self.feature_separability(X, y)
         self.structure_separability(A, y)
         self.likelihood_separability(X, A, y)
