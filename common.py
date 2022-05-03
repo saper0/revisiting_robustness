@@ -100,7 +100,6 @@ class CSBM:
         Optionally only check for nodes in ids.
         
         Return tuple: #separable, #non-separable."""
-        print(f"Feature Separability:")
         n_corr = 0
         n_wrong = 0
         if ids is None:
@@ -116,14 +115,11 @@ class CSBM:
                 n_corr += 1
             else:
                 n_wrong += 1
-        print(f"n_corr: {n_corr}")
-        print(f"n_wrong: {n_wrong}")
         return n_corr, n_wrong
 
     def structure_separability(self, A, y, ids=None):
         """Return tuple: #separable, #non-separable."""
         # Check how much nodes are correct w.r.t. structure likelihood
-        print(f"Structure Separability:")
         n_corr = 0
         n_wrong = 0
         if ids is None:
@@ -135,14 +131,11 @@ class CSBM:
                 n_corr += 1
             else:
                 n_wrong += 1
-        print(f"n_corr: {n_corr}")
-        print(f"n_wrong: {n_wrong}")
         return n_corr, n_wrong
 
     def likelihood_separability(self, X, A, y, ids=None):
         """Return tuple: #separable, #non-separable."""
         # Check how much nodes are correct w.r.t. likelihood
-        print(f"Likelihood Separability:")
         n_corr = 0
         n_wrong = 0
         if ids is None:
@@ -154,16 +147,24 @@ class CSBM:
                 n_corr += 1
             else:
                 n_wrong += 1
-        print(f"n_corr: {n_corr}")
-        print(f"n_wrong: {n_wrong}")
         return n_corr, n_wrong
 
     def check_separabilities(self, X, A, y, ids=None):
         """Check separability of graph X,A,y. 
         
         Optionally only check for nodes in ids."""
-        self.feature_separability(X, y, ids)
-        self.structure_separability(A, y, ids)
-        self.likelihood_separability(X, A, y, ids)
+
+        print(f"Feature Separability:")
+        n_corr, n_wrong = self.feature_separability(X, y, ids)
+        print(f"n_corr: {n_corr}")
+        print(f"n_wrong: {n_wrong}")
+        print(f"Structure Separability:")
+        n_corr, n_wrong = self.structure_separability(A, y, ids)
+        print(f"n_corr: {n_corr}")
+        print(f"n_wrong: {n_wrong}")
+        print(f"Likelihood Separability:")
+        n_corr, n_wrong = self.likelihood_separability(X, A, y, ids)
+        print(f"n_corr: {n_corr}")
+        print(f"n_wrong: {n_wrong}")
 
        
