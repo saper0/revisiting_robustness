@@ -15,14 +15,12 @@ class CSBM:
         self.cov = cov
         self.d = len(mu)
 
-    def sample(self, n, seed = 0) -> Tuple[TensorType["n", "d"], 
-                                           TensorType["n", "n"],
-                                           TensorType["n"]]:
+    def sample(self, n, seed = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Sample y~Bin(1/2) and X,A ~ CSBM(n, p, q, mu, cov). 
         
-        Return X: torch.tensor, 
-               A: torch.tensor, 
-               y: torch.tensor."""
+        Return X: np.ndarray, 
+               A: np.ndarray, 
+               y: np.ndarray."""
         np.random.seed(seed)
         # Sample y
         y = np.random.randint(0,2,size=n)
@@ -46,6 +44,35 @@ class CSBM:
         A = np.random.binomial(1, edge_prob)
         A += A.T
         return X, A, y
+
+    def sample_conditional(self, n, X: np.ndarray, A: np.ndarray, y: np.ndarray) \
+                                 -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Sample X', A', y' ~ D_n(X, A, y)"""
+        assert n == 1, "Only implemented for inductive sampling of a single node"
+
+        # Sample y' | y:
+        y_n = np.random.randint(0, 2, size=n)
+        y_new = np.hstack((y, y_n))
+
+        # Sample X' | y', X
+        x_n = np.random.multivariate_normal((2*y_n - 1)*self.mu, self.cov, size=n).astype(np.float32)
+        X_new = np.vstack((X, x_n))
+
+        # Sample A' | y', A
+        old_n = len(y)
+        edge_prob = np.zeros((n,old_n+n))
+        for i in range(old_n):
+            for j in range(n):
+                if y_new[i] == y_new[old_n+j]:
+                    edge_prob[j,i] = self.p
+                else:
+                    edge_prob[j,i] = self.q
+        a_n = np.random.binomial(1, edge_prob)
+        A_tmp = np.vstack((A, a_n[0, :-1]))
+        A_new = np.hstack((A_tmp, a_n.T))
+
+        return X_new, A_new, y_new
+
 
     def likelihood(self, n_id, n_cls, X, A, y):
         """Return likelihood of node n_id being class n_cls given graph X,A,y.
@@ -153,7 +180,6 @@ class CSBM:
         """Check separability of graph X,A,y. 
         
         Optionally only check for nodes in ids."""
-
         print(f"Feature Separability:")
         n_corr, n_wrong = self.feature_separability(X, y, ids)
         print(f"n_corr: {n_corr}")
@@ -167,4 +193,43 @@ class CSBM:
         print(f"n_corr: {n_corr}")
         print(f"n_wrong: {n_wrong}")
 
-       
+
+def get_sbm_model(n, avg_intra_degree, avg_inter_degree, K=0.5, sigma=0.1) \
+                                                                    -> CSBM:
+    """
+    Return correctly parametrized CSBM class. 
+    avg_intra_degree = intra_edges_per_node * 2
+    K ... Defines distance between means of the gaußians in sigma-units
+    """
+    p = avg_intra_degree * 2 / (n - 1)
+    q = avg_inter_degree * 2 / (n - 1)
+    d = round(n / math.log(n)**2)
+    mu = np.array([K*sigma / (2 * d**0.5) for i in range(d)], dtype=np.float32)
+    cov = sigma**2 * np.identity(d, dtype=np.float32)
+    return CSBM(p, q, mu, cov)
+
+
+def add_adversarial_edge(n_idx, A: np.ndarray, y: np.ndarray):
+    """Randomly add an adversarial edge for node n_idx to matrix A. 
+    
+    Connects n_idx with a random node of different class not already a neighbour
+    to n_idx. Like local DICE but without removing random nodes.
+
+    Return new neighbour idx."""
+    n = y.shape[0]
+    if y[n_idx] == 0:
+        pot_neighbours = np.arange(0, n)[y == 1]
+    else:
+        pot_neighbours = np.arange(0, n)[y == 0]
+    print(y)
+    print(pot_neighbours)
+    # Add an edge to a node of different class
+    np.random.shuffle(pot_neighbours)
+    for j in pot_neighbours:
+        if A[n_idx,j] == 1:
+            continue
+        else:
+            A[n_idx,j] = 1
+            A[j,n_idx] = 1
+            return j
+    assert(False)
