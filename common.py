@@ -221,8 +221,6 @@ def add_adversarial_edge(n_idx, A: np.ndarray, y: np.ndarray):
         pot_neighbours = np.arange(0, n)[y == 1]
     else:
         pot_neighbours = np.arange(0, n)[y == 0]
-    print(y)
-    print(pot_neighbours)
     # Add an edge to a node of different class
     np.random.shuffle(pot_neighbours)
     for j in pot_neighbours:
