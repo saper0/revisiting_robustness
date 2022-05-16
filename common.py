@@ -265,7 +265,8 @@ class LocalAttack:
         its neighbourhood. Sorting of potential new neighbours defined by
         attack method in initialization.
         
-        Return nodes index newly connected to target node.
+        Return nodes index newly connected to target node or -1 if no 
+        neighbours to connect to anymore.
         """
         A, n_idx = self.A, self.target
         for j in self.pot_neighbours:
@@ -275,4 +276,5 @@ class LocalAttack:
                 A[n_idx,j] = 1
                 A[j,n_idx] = 1
                 return j
-        assert False, "Case adversarial edge to add not handeled."
+        return -1
+        #assert False, "Case adversarial edge to add not handeled."
