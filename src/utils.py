@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 from torchtyping import TensorType, patch_typeguard
@@ -8,7 +8,7 @@ patch_typeguard()
 
 @typechecked
 def accuracy(logits: TensorType["n", "c"], labels: TensorType["n"], 
-             split_idx: Optional[np.ndarray] = None) -> float:
+             split_idx: Optional[Union[np.ndarray, int]] = None) -> float:
     """Returns the accuracy for a tensor of logits and a list of lables.
     
     Optionally, split indices can be given. Then, only the nodes in the split
@@ -18,8 +18,8 @@ def accuracy(logits: TensorType["n", "c"], labels: TensorType["n"],
         logits (TensorType["n", "c"]): logits (`.argmax(1)` should return most 
             probable class).
         labels (TensorType["n"]): target labels
-        split_idx (Optional[np.ndarray], optional): array with indices for 
-            current split. Defaults to None.
+        split_idx (np.ndarray|int, optional): index or array with indices for 
+            which accuracy should be evaluated. Defaults to None.
 
     Returns:
         float: Accuracy of logits w.r.t. given labels.

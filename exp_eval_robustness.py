@@ -8,6 +8,7 @@ from sacred.run import Run
 import torch
 
 from src.data import split
+from src.eval import evaluate_robustness
 from src.graph_models import create_graph_model
 from src.models import create_model
 from src.train import train_inductive, train_transductive
@@ -48,6 +49,7 @@ def config():
         sigma = 0.1,
         avg_within_class_degree = 1.5 * 2,
         avg_between_class_degree = 0.5 * 2,
+        inductive_samples = 1000,
     )
 
     model_params = dict(
@@ -138,6 +140,18 @@ def configure_hardware(
     return device
 
 
+def log_prediction_statistics(c_acc_bayes, c_acc_gnn, c_acc_bayes_structure,
+                              c_acc_bayes_feature, c_acc_bayes_gnn, 
+                              c_acc_bayes_not_gnn, c_acc_gnn_not_bayes):
+    logging.info(f"Prediction Statistics:")
+    logging.info(f"Count BC: {c_acc_bayes:.1f} GNN: {c_acc_gnn:.1f}")
+    logging.info(f"Count Structure BC: {c_acc_bayes_structure:.1f} "
+                 f"Feature BC: {c_acc_bayes_feature:.1f}")
+    logging.info(f"Count BC and GNN: {c_acc_bayes_gnn:.1f}")
+    logging.info(f"Count BC not GNN: {c_acc_bayes_not_gnn:.1f} "
+                 f"GNN not BC: {c_acc_gnn_not_bayes:.1f}")
+
+
 @ex.automain
 def run(data_params: Dict[str, Any], 
         model_params: Dict[str, Any], 
@@ -170,9 +184,19 @@ def run(data_params: Dict[str, Any],
     model = create_model(model_params_trn).to(device)
     #logging.info(model)
 
+    # Train Model
     if train_params["inductive"]:
         train = train_inductive
     else:
         train = train_transductive
     statistics = train(model, X, A, y, split_trn, split_val, train_params,
                        verbosity_params, _run)
+
+    # Robustness Evaluation
+    prediction_stats = evaluate_robustness(model, 
+                                           graph_model, 
+                                           X_np, A_np, y_np,
+                                           data_params["inductive_samples"], 
+                                           device)
+
+    log_prediction_statistics(*prediction_stats[0])

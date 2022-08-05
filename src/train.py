@@ -187,6 +187,7 @@ def train_inductive(
         acc_trn = accuracy(logits, y_trn)
 
         with torch.no_grad():
+            model.eval()
             logits = model(X, A)
             loss_val = loss(logits[split_val], y[split_val])
             acc_val = accuracy(logits, y, split_val)
