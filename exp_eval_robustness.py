@@ -169,7 +169,8 @@ def log_robust_statistics(c_bayes_higher_robust, c_bayes_gnn_equal_robust,
 def log_deg_dict(name_deg_dict1: str, deg_dict1: Dict[int, int],  
                    name_deg_dict2: str, deg_dict2: Dict[int, int]):
     """Log Degree-Dependent Robustness of BC and GNN."""
-    max_deg = max([max(deg_dict1.keys()), max(deg_dict2.keys())])
+    max_deg = max([max([int(deg) for deg in deg_dict1.keys()]), 
+                   max([int(deg) for deg in deg_dict2.keys()])])
     ordered_avg_dict1 = [deg_dict1[i] if i in deg_dict1 else -1 for i in range(max_deg+1)]
     ordered_avg_dict2 = [deg_dict2[i] if i in deg_dict2 else -1 for i in range(max_deg+1)]
     for deg in range(max_deg+1):
@@ -180,9 +181,9 @@ def log_deg_dict(name_deg_dict1: str, deg_dict1: Dict[int, int],
 def log_wrt_bayes_dicts(gnn_wrt_bayes_robust, bayes_robust_when_both,
                         gnn_robust_when_both):
     """Log robustness w.r.t. bayes classifier results."""
-    max_deg = max([max(gnn_wrt_bayes_robust.keys()), 
-                   max(bayes_robust_when_both.keys()),
-                   max(gnn_robust_when_both.keys())])
+    max_deg = max([max([int(deg) for deg in gnn_wrt_bayes_robust.keys()]), 
+                   max([int(deg) for deg in bayes_robust_when_both.keys()]),
+                   max([int(deg) for deg in gnn_robust_when_both.keys()])])
     ordered_gnn_wrt_bayes_robust = [gnn_wrt_bayes_robust[i] if i in gnn_wrt_bayes_robust else -1 for i in range(max_deg+1)]
     ordered_bayes_robust_when_both = [bayes_robust_when_both[i] if i in bayes_robust_when_both else -1 for i in range(max_deg+1)]
     ordered_gnn_robust_when_both = [gnn_robust_when_both[i] if i in gnn_robust_when_both else -1 for i in range(max_deg+1)]

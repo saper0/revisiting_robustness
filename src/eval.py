@@ -202,47 +202,52 @@ def evaluate_robustness(model: nn.Module,
     std_bayes_robust = {}
     max_bayes_robust = {}
     for degree in c_acc_bayes_deg:
-        avg_bayes_robust[degree] = float(np.mean(c_bayes_robust[degree]))
-        med_bayes_robust[degree] = float(np.median(c_bayes_robust[degree]))
-        std_bayes_robust[degree] = float(np.std(c_bayes_robust[degree]))
-        max_bayes_robust[degree] = float(np.max(c_bayes_robust[degree]))
+        degree = int(degree)
+        avg_bayes_robust[f"{degree}"] = float(np.mean(c_bayes_robust[degree]))
+        med_bayes_robust[f"{degree}"] = float(np.median(c_bayes_robust[degree]))
+        std_bayes_robust[f"{degree}"] = float(np.std(c_bayes_robust[degree]))
+        max_bayes_robust[f"{degree}"] = float(np.max(c_bayes_robust[degree]))
     avg_gnn_robust = {}
     med_gnn_robust = {}
     std_gnn_robust = {}
     max_gnn_robust = {}
     for degree in c_acc_gnn_deg:
-        avg_gnn_robust[degree] = float(np.mean(c_gnn_robust[degree]))
-        med_gnn_robust[degree] = float(np.median(c_gnn_robust[degree]))
-        std_gnn_robust[degree] = float(np.std(c_gnn_robust[degree]))
-        max_gnn_robust[degree] = float(np.max(c_gnn_robust[degree]))
+        degree = int(degree)
+        avg_gnn_robust[f"{degree}"] = float(np.mean(c_gnn_robust[degree]))
+        med_gnn_robust[f"{degree}"] = float(np.median(c_gnn_robust[degree]))
+        std_gnn_robust[f"{degree}"] = float(np.std(c_gnn_robust[degree]))
+        max_gnn_robust[f"{degree}"] = float(np.max(c_gnn_robust[degree]))
     avg_gnn_wrt_bayes_robust = {}
     med_gnn_wrt_bayes_robust = {}
     std_gnn_wrt_bayes_robust = {}
     max_gnn_wrt_bayes_robust = {}
     # Robustness GNN w.r.t. Bayes
     for degree in c_acc_bayes_gnn_deg:
-        avg_gnn_wrt_bayes_robust[degree] = float(np.mean(c_gnn_wrt_bayes_robust[degree]))
-        med_gnn_wrt_bayes_robust[degree] = float(np.median(c_gnn_wrt_bayes_robust[degree]))
-        std_gnn_wrt_bayes_robust[degree] = float(np.std(c_gnn_wrt_bayes_robust[degree]))
-        max_gnn_wrt_bayes_robust[degree] = float(np.max(c_gnn_wrt_bayes_robust[degree]))
+        degree = int(degree)
+        avg_gnn_wrt_bayes_robust[f"{degree}"] = float(np.mean(c_gnn_wrt_bayes_robust[degree]))
+        med_gnn_wrt_bayes_robust[f"{degree}"] = float(np.median(c_gnn_wrt_bayes_robust[degree]))
+        std_gnn_wrt_bayes_robust[f"{degree}"] = float(np.std(c_gnn_wrt_bayes_robust[degree]))
+        max_gnn_wrt_bayes_robust[f"{degree}"] = float(np.max(c_gnn_wrt_bayes_robust[degree]))
     avg_bayes_robust_when_both = {}
     med_bayes_robust_when_both = {}
     std_bayes_robust_when_both = {}
     max_bayes_robust_when_both = {}
     for degree in c_acc_bayes_gnn_deg:
-        avg_bayes_robust_when_both[degree] = float(np.mean(c_bayes_robust_when_both[degree]))
-        med_bayes_robust_when_both[degree] = float(np.median(c_bayes_robust_when_both[degree]))
-        std_bayes_robust_when_both[degree] = float(np.std(c_bayes_robust_when_both[degree]))
-        max_bayes_robust_when_both[degree] = float(np.max(c_bayes_robust_when_both[degree]))
+        degree = int(degree)
+        avg_bayes_robust_when_both[f"{degree}"] = float(np.mean(c_bayes_robust_when_both[degree]))
+        med_bayes_robust_when_both[f"{degree}"] = float(np.median(c_bayes_robust_when_both[degree]))
+        std_bayes_robust_when_both[f"{degree}"] = float(np.std(c_bayes_robust_when_both[degree]))
+        max_bayes_robust_when_both[f"{degree}"] = float(np.max(c_bayes_robust_when_both[degree]))
     avg_gnn_robust_when_both = {}
     med_gnn_robust_when_both = {}
     std_gnn_robust_when_both = {}
     max_gnn_robust_when_both = {}
     for degree in c_acc_bayes_gnn_deg:
-        avg_gnn_robust_when_both[degree] = float(np.mean(c_gnn_robust_when_both[degree]))
-        med_gnn_robust_when_both[degree] = float(np.median(c_gnn_robust_when_both[degree]))
-        std_gnn_robust_when_both[degree] = float(np.std(c_gnn_robust_when_both[degree]))
-        max_gnn_robust_when_both[degree] = float(np.max(c_gnn_robust_when_both[degree]))
+        degree = int(degree)
+        avg_gnn_robust_when_both[f"{degree}"] = float(np.mean(c_gnn_robust_when_both[degree]))
+        med_gnn_robust_when_both[f"{degree}"] = float(np.median(c_gnn_robust_when_both[degree]))
+        std_gnn_robust_when_both[f"{degree}"] = float(np.std(c_gnn_robust_when_both[degree]))
+        max_gnn_robust_when_both[f"{degree}"] = float(np.max(c_gnn_robust_when_both[degree]))
 
     return dict(
             prediction_statistics = dict(
