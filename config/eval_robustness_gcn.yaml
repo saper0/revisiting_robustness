@@ -1,0 +1,50 @@
+seml:
+  name: eval_robustness_gcn
+  executable: exp_eval_robustness.py
+  project_root_dir: ../
+  output_dir: log
+
+slurm:
+  experiments_per_job: 1
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 10G          # memory
+    cpus-per-task: 4  # num cores
+    time: 0-00:30     # max time, D-HH:MM
+
+fixed:
+  data_params:
+    inductive_samples: 100
+
+grid:
+  data_params:
+    seed:
+      type: choice
+      options:
+        - 0
+        #- 1
+        #- 2
+        #- 3
+        #- 4
+        #- 5
+        #- 6
+        #- 7
+        #- 8
+        #- 42
+
+    K:
+      type: choice
+      options:
+        #- 0.1
+        - 0.5
+        #- 1
+        #- 1.5
+        #- 2
+        #- 5
+
+  attack_params:
+    attack: 
+      type: choice
+      options:
+      - "l2"
+      #- "random"

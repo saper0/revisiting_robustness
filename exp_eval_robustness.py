@@ -44,7 +44,7 @@ def config():
         graph_model = 'CSBM',
         classes = 2,
         n = 1000,
-        n_per_class_trn = 250,
+        n_per_class_trn = 400,
         K = 0.5,
         sigma = 0.1,
         avg_within_class_degree = 1.5 * 2,
@@ -64,6 +64,10 @@ def config():
         patience=300,
         max_epochs=3000,
         inductive=True
+    )
+
+    attack_params = dict(
+        attack = "l2"
     )
 
     verbosity_params = dict(
@@ -95,7 +99,8 @@ def set_debug_lvl(debug_lvl: str):
 
 
 def log_configuration(data_params: Dict[str, Any], model_params: Dict[str, Any], 
-                      train_params: Dict[str, Any], verbosity_params: Dict[str, Any], 
+                      train_params: Dict[str, Any], attack_params: Dict[str, Any],
+                      verbosity_params: Dict[str, Any], 
                       other_params: Dict[str, Any], seed: int, 
                       db_collection: Optional[str]) -> None:
     """Log (print) experiment configuration."""
@@ -103,6 +108,7 @@ def log_configuration(data_params: Dict[str, Any], model_params: Dict[str, Any],
     logging.info(f"data_params: {data_params}")
     logging.info(f"model_params: {model_params}")
     logging.info(f"train_params: {train_params}")
+    logging.info(f"attack_params: {attack_params}")
     logging.info(f"verbosity_params: {verbosity_params}")
     logging.info(f"other_params: {other_params}")
     logging.info(f"seed: {seed}")
@@ -152,20 +158,59 @@ def log_prediction_statistics(c_acc_bayes, c_acc_gnn, c_acc_bayes_structure,
                  f"GNN not BC: {c_acc_gnn_not_bayes:.1f}")
 
 
+def log_robust_statistics(c_bayes_higher_robust, c_bayes_gnn_equal_robust,
+                            c_gnn_higher_robust):
+    logging.info(f"Robustness Statistics:")
+    logging.info(f"BC more robust than GNN: {c_bayes_higher_robust:.1f}")
+    logging.info(f"BC & GNN equal robustness: {c_bayes_gnn_equal_robust:.1f}")
+    logging.info(f"BC less robust than GNN: {c_gnn_higher_robust:.1f}")
+
+
+def log_deg_dict(name_deg_dict1: str, deg_dict1: Dict[int, int],  
+                   name_deg_dict2: str, deg_dict2: Dict[int, int]):
+    """Log Degree-Dependent Robustness of BC and GNN."""
+    max_deg = max([max(deg_dict1.keys()), max(deg_dict2.keys())])
+    ordered_avg_dict1 = [deg_dict1[i] if i in deg_dict1 else -1 for i in range(max_deg+1)]
+    ordered_avg_dict2 = [deg_dict2[i] if i in deg_dict2 else -1 for i in range(max_deg+1)]
+    for deg in range(max_deg+1):
+        logging.info(f"Degree {deg}: {name_deg_dict1}: {ordered_avg_dict1[deg]:.2f}; "
+                     f"{name_deg_dict2}: {ordered_avg_dict2[deg]:.2f}; ")
+
+
+def log_wrt_bayes_dicts(gnn_wrt_bayes_robust, bayes_robust_when_both,
+                        gnn_robust_when_both):
+    """Log robustness w.r.t. bayes classifier results."""
+    max_deg = max([max(gnn_wrt_bayes_robust.keys()), 
+                   max(bayes_robust_when_both.keys()),
+                   max(gnn_robust_when_both.keys())])
+    ordered_gnn_wrt_bayes_robust = [gnn_wrt_bayes_robust[i] if i in gnn_wrt_bayes_robust else -1 for i in range(max_deg+1)]
+    ordered_bayes_robust_when_both = [bayes_robust_when_both[i] if i in bayes_robust_when_both else -1 for i in range(max_deg+1)]
+    ordered_gnn_robust_when_both = [gnn_robust_when_both[i] if i in gnn_robust_when_both else -1 for i in range(max_deg+1)]
+     
+    for deg in range(max_deg+1):
+        logging.info(
+            f"Degree {deg}: <GNN wrt BC robust>: {ordered_gnn_wrt_bayes_robust[deg]:.2f}/"
+            f"{ordered_bayes_robust_when_both[deg]:.2f}. <GNN in wrt BC setting>: "
+            f"{ordered_gnn_robust_when_both[deg]:.2f}"
+        )
+
+
 @ex.automain
 def run(data_params: Dict[str, Any], 
         model_params: Dict[str, Any], 
         train_params: Dict[str, Any], 
+        attack_params: Dict[str, Any],
         verbosity_params: Dict[str, Any], 
         other_params: Dict[str, Any],
-        seed: int, db_collection: Optional[str], _run: Run):
+        seed: int, 
+        db_collection: Optional[str], _run: Run):
     """ Run experiment with given configuration.
 
     _run: Run
         Used to log statistics using sacred.
     """
-    log_configuration(data_params, model_params, train_params, verbosity_params, 
-                      other_params, seed, db_collection)
+    log_configuration(data_params, model_params, train_params, attack_params,
+                      verbosity_params, other_params, seed, db_collection)
     _run = configure_logging(verbosity_params, other_params, _run)
     device = configure_hardware(other_params, seed)
 
@@ -189,14 +234,40 @@ def run(data_params: Dict[str, Any],
         train = train_inductive
     else:
         train = train_transductive
-    statistics = train(model, X, A, y, split_trn, split_val, train_params,
-                       verbosity_params, _run)
+    trn_statistics = train(model, X, A, y, split_trn, split_val, train_params,
+                           verbosity_params, _run)
 
     # Robustness Evaluation
-    prediction_stats = evaluate_robustness(model, 
-                                           graph_model, 
-                                           X_np, A_np, y_np,
-                                           data_params["inductive_samples"], 
-                                           device)
+    results_dict = evaluate_robustness(model, 
+                                       graph_model, 
+                                       X_np, A_np, y_np,
+                                       data_params["inductive_samples"], 
+                                       attack_params,
+                                       device)
 
-    log_prediction_statistics(*prediction_stats[0])
+    log_prediction_statistics(**results_dict["prediction_statistics"])
+    robustness_statistics = results_dict["robustness_statistics"]
+    log_robust_statistics(
+        c_bayes_gnn_equal_robust=robustness_statistics["c_bayes_gnn_equal_robust"],
+        c_bayes_higher_robust=robustness_statistics["c_bayes_higher_robust"],
+        c_gnn_higher_robust=robustness_statistics["c_gnn_higher_robust"]
+    )
+    log_deg_dict("<BC robust>", robustness_statistics["avg_bayes_robust"], 
+                 "<GNN robust>", robustness_statistics["avg_gnn_robust"])
+    log_deg_dict("Max(BC robust)", robustness_statistics["max_bayes_robust"], 
+                 "Max(GNN robust)", robustness_statistics["max_gnn_robust"])
+    log_deg_dict("Median(BC robust)", robustness_statistics["med_bayes_robust"], 
+                 "Median(GNN robust)", robustness_statistics["med_gnn_robust"])
+    log_wrt_bayes_dicts(robustness_statistics["avg_gnn_wrt_bayes_robust"], 
+                        robustness_statistics["avg_bayes_robust_when_both"], 
+                        robustness_statistics["avg_gnn_robust_when_both"])
+     
+    return dict(
+        prediction_statistics = results_dict["prediction_statistics"],
+        robustness_statistics = results_dict["robustness_statistics"],
+        training_loss = trn_statistics[0],
+        validation_loss = trn_statistics[1],
+        training_accuracy = trn_statistics[2],
+        validation_accuracy = trn_statistics[3]
+    )
+

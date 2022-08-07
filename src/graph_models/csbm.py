@@ -92,7 +92,8 @@ class CSBM(GraphGenerationModel):
         y_new = np.hstack((y, y_n))
 
         # Sample X' | y', X
-        x_n = np.random.multivariate_normal((2*y_n - 1)*self.mu, self.cov, size=n).astype(np.float32)
+        x_n = np.random.multivariate_normal((2*y_n - 1)*self.mu, self.cov, 
+                                            size=n).astype(np.float32)
         X_new = np.vstack((X, x_n))
 
         # Sample A' | y', A
