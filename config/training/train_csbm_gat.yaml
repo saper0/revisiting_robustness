@@ -1,0 +1,72 @@
+seml:
+  name: trn_gat
+  executable: exp_train.py
+  project_root_dir: ../../
+  output_dir: log/training
+
+slurm:
+  experiments_per_job: 1
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 10G          # memory
+    cpus-per-task: 4  # num cores
+    time: 0-00:30     # max time, D-HH:MM
+
+fixed:
+  train_params:
+    inductive: True
+
+  model_params:
+    label: GAT
+    model: GAT
+    n_heads: 8
+    n_features_per_head: 8
+
+grid:
+  data_params:
+    K:
+      type: choice
+      options:
+        - 0.1
+        - 0.5
+        - 1
+        - 1.5
+        - 2
+        - 5
+
+  model_params:
+    dropout:
+      type: choice
+      options:
+        - 0.0
+        - 0.3
+        - 0.6
+
+    dropout_neighbourhood:
+      type: choice
+      options:
+        - 0.0
+        - 0.3
+        - 0.6
+
+  train_params:
+    lr: 
+      type: choice
+      options:
+        - 0.1
+        - 0.01
+        - 0.001
+
+    weight_decay:
+      type: choice
+      options:
+        - 0.01
+        - 0.001
+        - 0.0001
+
+  seed:
+    type: choice
+    options:
+      - 0
+      - 1
+      - 2

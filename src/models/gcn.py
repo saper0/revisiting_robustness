@@ -25,7 +25,8 @@ patch_typeguard()
 
 
 class DenseGraphConvolution(nn.Module):
-    """Dense GCN convolution layer for the FGSM attack that requires a gradient towards the adjacency matrix.
+    """Dense GCN convolution layer for the FGSM attack that requires a gradient 
+    towards the adjacency matrix.
     """
 
     def __init__(self, in_channels: int, out_channels: int):

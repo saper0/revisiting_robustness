@@ -46,9 +46,9 @@ def config():
         n = 1000,
         n_per_class_trn = 400,
         K = 0.5,
-        sigma = 0.1,
-        avg_within_class_degree = 1.5 * 2,
-        avg_between_class_degree = 0.5 * 2,
+        sigma = 1,
+        avg_within_class_degree = 1.58 * 2,
+        avg_between_class_degree = 0.37 * 2,
         inductive_samples = 1000,
     )
 
@@ -56,6 +56,7 @@ def config():
         label="GCN",
         model="DenseGCN",
         n_filters=64,
+        dropout=0.5,
     )
 
     train_params = dict(
@@ -171,8 +172,8 @@ def log_deg_dict(name_deg_dict1: str, deg_dict1: Dict[int, int],
     """Log Degree-Dependent Robustness of BC and GNN."""
     max_deg = max([max([int(deg) for deg in deg_dict1.keys()]), 
                    max([int(deg) for deg in deg_dict2.keys()])])
-    ordered_avg_dict1 = [deg_dict1[i] if i in deg_dict1 else -1 for i in range(max_deg+1)]
-    ordered_avg_dict2 = [deg_dict2[i] if i in deg_dict2 else -1 for i in range(max_deg+1)]
+    ordered_avg_dict1 = [deg_dict1[str(i)] if str(i) in deg_dict1 else -1 for i in range(max_deg+1)]
+    ordered_avg_dict2 = [deg_dict2[str(i)] if str(i) in deg_dict2 else -1 for i in range(max_deg+1)]
     for deg in range(max_deg+1):
         logging.info(f"Degree {deg}: {name_deg_dict1}: {ordered_avg_dict1[deg]:.2f}; "
                      f"{name_deg_dict2}: {ordered_avg_dict2[deg]:.2f}; ")
@@ -184,10 +185,9 @@ def log_wrt_bayes_dicts(gnn_wrt_bayes_robust, bayes_robust_when_both,
     max_deg = max([max([int(deg) for deg in gnn_wrt_bayes_robust.keys()]), 
                    max([int(deg) for deg in bayes_robust_when_both.keys()]),
                    max([int(deg) for deg in gnn_robust_when_both.keys()])])
-    ordered_gnn_wrt_bayes_robust = [gnn_wrt_bayes_robust[i] if i in gnn_wrt_bayes_robust else -1 for i in range(max_deg+1)]
-    ordered_bayes_robust_when_both = [bayes_robust_when_both[i] if i in bayes_robust_when_both else -1 for i in range(max_deg+1)]
-    ordered_gnn_robust_when_both = [gnn_robust_when_both[i] if i in gnn_robust_when_both else -1 for i in range(max_deg+1)]
-     
+    ordered_gnn_wrt_bayes_robust = [gnn_wrt_bayes_robust[str(i)] if str(i) in gnn_wrt_bayes_robust else -1 for i in range(max_deg+1)]
+    ordered_bayes_robust_when_both = [bayes_robust_when_both[str(i)] if str(i) in bayes_robust_when_both else -1 for i in range(max_deg+1)]
+    ordered_gnn_robust_when_both = [gnn_robust_when_both[str(i)] if str(i) in gnn_robust_when_both else -1 for i in range(max_deg+1)]
     for deg in range(max_deg+1):
         logging.info(
             f"Degree {deg}: <GNN wrt BC robust>: {ordered_gnn_wrt_bayes_robust[deg]:.2f}/"
@@ -235,8 +235,8 @@ def run(data_params: Dict[str, Any],
         train = train_inductive
     else:
         train = train_transductive
-    trn_statistics = train(model, X, A, y, split_trn, split_val, train_params,
-                           verbosity_params, _run)
+    train_tracker = train(model, X, A, y, split_trn, split_val, train_params,
+                          verbosity_params, _run)
 
     # Robustness Evaluation
     results_dict = evaluate_robustness(model, 
@@ -246,6 +246,7 @@ def run(data_params: Dict[str, Any],
                                        attack_params,
                                        device)
 
+    # (Optional) Logging of Robusntess Statistics
     log_prediction_statistics(**results_dict["prediction_statistics"])
     robustness_statistics = results_dict["robustness_statistics"]
     log_robust_statistics(
@@ -266,9 +267,9 @@ def run(data_params: Dict[str, Any],
     return dict(
         prediction_statistics = results_dict["prediction_statistics"],
         robustness_statistics = results_dict["robustness_statistics"],
-        training_loss = trn_statistics[0],
-        validation_loss = trn_statistics[1],
-        training_accuracy = trn_statistics[2],
-        validation_accuracy = trn_statistics[3]
+        training_loss = train_tracker.get_training_loss(),
+        validation_loss = train_tracker.get_validation_loss(),
+        training_accuracy = train_tracker.get_training_accuracy(),
+        validation_accuracy = train_tracker.get_validation_accuracy()
     )
 

@@ -51,6 +51,26 @@ class TrainingTracker():
     def get_best_model_state(self):
         return self.best_state
 
+    def get_best_epoch(self) -> int:
+        """Return best training epoch (1-based)."""
+        return self.best_epoch + 1
+
+    def get_training_epochs(self) -> int:
+        """Return 1-based training epochs."""
+        return self.epoch + 1
+
+    def get_training_loss(self) -> List[float]:
+        return self.loss_trn
+
+    def get_validation_loss(self) -> List[float]:
+        return self.loss_val
+
+    def get_training_accuracy(self) -> List[float]:
+        return self.acc_trn
+
+    def get_validation_accuracy(self) -> List[float]:
+        return self.acc_val
+
     def is_better_loss(self, loss_val):
         if self.minimization:
             return self.loss_val[self.best_epoch] > loss_val
@@ -127,7 +147,7 @@ def train_inductive(
           train_params: Dict[str, Any], 
           verbosity_params: Dict[str, Any], 
           _run: Optional[Run]=None
-) -> Tuple[List[float], List[float], List[float], List[float], int]:
+) -> TrainingTracker:
     """Train a model on a given graph inductively using a given trn/val split.
     
     Training is not batched but uses the whole graph in one forward pass.
@@ -207,7 +227,7 @@ def train_inductive(
     train_tracker.print_best_epoch()
 
     model.load_state_dict(train_tracker.get_best_model_state())
-    return train_tracker.get_statistics()
+    return train_tracker
 
 
 @typechecked
@@ -221,7 +241,7 @@ def train_transductive(
         train_params: Dict[str, Any], 
         verbosity_params: Dict[str, Any], 
         _run: Optional[Run]=None
-) -> Tuple[List[float], List[float], List[float], List[float], int]:
+) -> TrainingTracker:
     """Train a model on a given graph transductively using a given trn/val split.
     
     Training is not batched but uses the whole graph in one forward pass.
@@ -287,4 +307,4 @@ def train_transductive(
     train_tracker.print_best_epoch()
 
     model.load_state_dict(train_tracker.get_best_model_state())
-    return train_tracker.get_statistics()
+    return train_tracker
