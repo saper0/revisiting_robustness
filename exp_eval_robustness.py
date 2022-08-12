@@ -31,6 +31,22 @@ def collect_stats(_run):
     seml.collect_exp_stats(_run)
 
 
+def get_exp_name(data_params: Dict[str, Any],
+                 model_params: Dict[str, Any],
+                 train_params: Dict[str, Any],
+                 attack_params: Dict[str, Any],
+                 seed) -> str:
+    K = data_params["K"]
+    exp_name = "robustness_" + data_params["graph_model"] + f"_K{K:.1f}_"
+    if train_params["inductive"]:
+        exp_name += "inductive" + "_" 
+    else:
+        exp_name += "transductive" + "_"
+    exp_name += model_params["label"] + "_" + attack_params["attack"]
+    exp_name += f"_seed{seed}"
+    return exp_name
+
+
 @ex.config
 def config():
     overwrite = None
@@ -83,7 +99,8 @@ def config():
     )
 
     seed = 1
-    ex.path = "name_of_exp"
+    ex.path = get_exp_name(data_params, model_params, train_params, 
+                           attack_params, seed)
 
 
 def set_debug_lvl(debug_lvl: str):

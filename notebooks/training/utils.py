@@ -1,5 +1,5 @@
 from pymongo import MongoClient
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -59,6 +59,42 @@ class Experiment:
             self.training_acc_l.append(results["best_training_accuracy"])
             self.best_epoch_l.append(results["best_epoch"])
             self.training_epoch_l.append(results["training_epochs"])
+
+    def to_dict(self, hyperparams_list: List[str]) -> Dict[str, Any]:
+        """Genereates a dict representation of the experiment.
+        
+        Stores in "_id" the ID of the experiment. other keys are the results 
+        and selected hyperparameter settings.
+        """
+        dict_repr = {}
+        dict_repr["_id"] = self.id
+        dict_repr["ValLoss"] = f"{self.validation_loss:.4f} " \
+                               f"+- {self.validation_loss_std:.4f}"
+        dict_repr["TrnLoss"] = f"{self.training_loss:.4f} " \
+                               f"+- {self.training_loss_std:.4f}"
+        dict_repr["ValAcc"] = f"{self.validation_accuracy:.4f} " \
+                              f"+- {self.validation_accuracy_std:.4f}"
+        dict_repr["TrnAcc"] = f"{self.training_accuracy:.4f} " \
+                              f"+- {self.training_accuracy_std:.4f}"
+        for param in hyperparams_list:
+            for config in [self.hyperparameters["data_params"],
+                           self.hyperparameters["model_params"],
+                           self.hyperparameters["train_params"]]:
+                if param in config:
+                    dict_repr[param] = config[param]
+        return dict_repr
+
+    @staticmethod
+    def to_dataframe(experiment_list: List["Experiment"], 
+                     hyperparams_list: List[str]):
+        experiment_dicts = []
+        index = []
+        for experiment in experiment_list:
+            experiment_dict = experiment.to_dict(hyperparams_list)
+            index.append(experiment_dict["_id"])
+            del experiment_dict["_id"]
+            experiment_dicts.append(experiment_dict)
+        return pd.DataFrame(experiment_dicts, index=index)
 
     @property
     def validation_loss(self):
@@ -177,4 +213,36 @@ class ExperimentLoader:
         return experiments_with_K
 
 
-#def experiment_list_to_dataframe(experiments: List[Experiment]) ->
+def get_best_hyperparams(
+    start_id: int, end_id: int, n_seeds: int, hyperparams: List[str], 
+    K: Union[List[int], int]
+) -> pd.DataFrame:
+    """Return experiments ordered by performance for a particular K or if K is
+    a list, return a list of the best experiments for each K.
+
+    Args:
+        start_id (int): ID of first experiment in hyperparameter search.
+        end_id (int): ID of last experiment in hyperparameter search.
+        n_seeds (int): Number of different seeds used for each hpyerparameter 
+            setting.
+        hyperparams (List[str]): Hyperparameters to dislay in dataframe.
+        K (Union[List[int], int]): Which K to look at.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
+    exp_loader = ExperimentLoader()
+    if not isinstance(K, list):
+        experiments = exp_loader.load_experiments(start_id, end_id, n_seeds, K)
+        return Experiment.to_dataframe(experiments, hyperparams)
+    else:
+        experiments = []
+        for k in K:
+            experiment = exp_loader.load_experiments(start_id, end_id, 
+                                                     n_seeds, k)[0]
+            experiments.append(experiment)
+        df = Experiment.to_dataframe(experiments, hyperparams)
+        df["id"] = df.index
+        df.index = K
+        return df
+            

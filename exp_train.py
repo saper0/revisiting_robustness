@@ -3,6 +3,7 @@ This experiment implements only training a model on a synthetic graph for
 hyperparameter optimization.
 """
 import logging
+import os
 from typing import Any, Dict, Union, Optional
 
 import numpy as np
@@ -159,6 +160,11 @@ def configure_hardware(
     # Seed
     torch.manual_seed(seed)
     np.random.seed(seed)
+    # Note on Reproducability: Some GNNs based on PyTorch Geometric make heavy
+    # use of non-deterministic scatter_add_() function 
+    # (https://pytorch.org/docs/stable/notes/randomness.html)
+    # for which no deterministic implementation exists. Hence, not all results
+    # can be reproduced in a deterministic manner.
 
     # Hardware
     torch.backends.cuda.matmul.allow_tf32 = other_params["allow_tf32"]
