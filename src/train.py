@@ -303,7 +303,7 @@ def train_transductive(
                                    normalize=False)
         loss_val = loss(logits[split_val], y[split_val])
         acc_val = accuracy(logits, y, split_val)
-        train_tracker.update(-1, loss_val, -1, acc_val)
+        train_tracker.update(-1, loss_val.detach().item(), -1, acc_val)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=train_params["lr"], 
                                     weight_decay=train_params["weight_decay"])

@@ -1,5 +1,5 @@
 seml:
-  name: trn_gcn
+  name: trn_lp
   executable: exp_train.py
   project_root_dir: ../../
   output_dir: log/training
@@ -16,6 +16,12 @@ fixed:
   train_params:
     inductive: True
 
+  model_params:
+    label: LP
+    model: None
+    use_label_propagation: True
+    lp_layers: 50
+
 grid:
   data_params:
     K:
@@ -29,29 +35,31 @@ grid:
         - 5
 
   model_params:
-    dropout:
+    lp_alpha:
       type: choice
       options:
-        - 0.0
-        - 0.3
-        - 0.5
-
-  train_params:
-    lr: 
-      type: choice
-      options:
-        - 0.1
-        - 0.01
-        - 0.001
-        - 0.0001
-
-    weight_decay:
-      type: choice
-      options:
-        - 0.01
-        - 0.001
-        - 0.0001
-
+        - 0.00
+        - 0.05
+        - 0.10
+        - 0.15
+        - 0.20
+        - 0.25
+        - 0.30
+        - 0.35
+        - 0.40
+        - 0.45
+        - 0.50
+        - 0.55
+        - 0.60
+        - 0.65
+        - 0.70
+        - 0.75
+        - 0.80
+        - 0.85
+        - 0.90
+        - 0.95
+        - 1.00
+        
   seed:
     type: choice
     options:

@@ -40,7 +40,10 @@ def get_exp_name(data_params: Dict[str, Any],
                  seed) -> str:
     K = data_params["K"]
     exp_name = "trn_" + data_params["graph_model"] + f"_K{K:.1f}_"
-    exp_name += "inductive" + str(train_params["inductive"]) + "_" 
+    if train_params["inductive"]:
+        exp_name += "inductive" + "_" 
+    else:
+        exp_name += "transductive" + "_"
     exp_name += model_params["label"] + f"_seed{seed}"
     return exp_name
     
