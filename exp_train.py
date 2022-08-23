@@ -16,6 +16,7 @@ from src.data import split
 from src.eval import evaluate_robustness
 from src.graph_models import create_graph_model
 from src.models import create_model
+from src.models.lp import LP
 from src.train import train_inductive, train_transductive
 
 try:
@@ -72,6 +73,7 @@ def config():
         model="DenseGCN",
         n_filters=64,
         dropout=0.5,
+        use_label_propagation=False,
     )
 
     train_params = dict(
@@ -210,7 +212,14 @@ def run(data_params: Dict[str, Any],
     model_params_trn = dict(**model_params, 
                             n_features=X_np.shape[1], 
                             n_classes=data_params["classes"])
-    model = create_model(model_params_trn).to(device)
+    model = create_model(model_params_trn)
+    if model is not None:
+        model = model.to(device)
+    lp = None
+    if model_params["use_label_propagation"]:
+        lp = LP(model_params["lp_layers"], 
+                model_params["lp_alpha"], 
+                data_params["classes"]).to(device)
     #logging.info(model)
 
     # Train Model
@@ -218,7 +227,7 @@ def run(data_params: Dict[str, Any],
         train = train_inductive
     else:
         train = train_transductive
-    trn_tracker = train(model, X, A, y, split_trn, split_val, train_params,
+    trn_tracker = train(model, lp, X, A, y, split_trn, split_val, train_params,
                         verbosity_params, _run)
 
     # Logging

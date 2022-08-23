@@ -2,7 +2,7 @@ seml:
   name: eval_robustness_gcn
   executable: exp_eval_robustness.py
   project_root_dir: ../../
-  output_dir: log/eval_robustness/
+  output_dir: log/eval_robustness
 
 slurm:
   experiments_per_job: 1
@@ -13,10 +13,12 @@ slurm:
     time: 0-00:30     # max time, D-HH:MM
 
 fixed:
+
   model_params:
-    label: GCN
-    model: DenseGCN
-    n_filters: 64
+    label: GAT
+    model: GAT
+    n_heads: 8
+    n_features_per_head: 8
 
   data_params:
     inductive_samples: 1000
@@ -52,11 +54,12 @@ K01:
       K: 0.1
 
     model_params:
-      dropout: 0.5
+      dropout: 0.0
+      dropout_neighbourhood: 0.0
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.001
+      lr: 0.10
+      weight_decay: 0.0001
 
 K05:
   fixed:
@@ -64,11 +67,12 @@ K05:
       K: 0.5
 
     model_params:
-      dropout: 0.5
+      dropout: 0.0
+      dropout_neighbourhood: 0.6
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.001
+      lr: 0.10
+      weight_decay: 0.0010
 
 K1:
   fixed:
@@ -76,11 +80,12 @@ K1:
       K: 1.0
 
     model_params:
-      dropout: 0.3
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.010
+      lr: 0.10
+      weight_decay: 0.0010
 
 K15:
   fixed:
@@ -88,11 +93,12 @@ K15:
       K: 1.5
 
     model_params:
-      dropout: 0.3
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.010
+      lr: 0.01
+      weight_decay: 0.0001
 
 K2:
   fixed:
@@ -100,11 +106,12 @@ K2:
       K: 2.0
 
     model_params:
-      dropout: 0.5
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.010
+      lr: 0.10
+      weight_decay: 0.0010
 
 K5:
   fixed:
@@ -113,7 +120,8 @@ K5:
 
     model_params:
       dropout: 0.0
+      dropout_neighbourhood: 0.0
 
     train_params:
-      lr: 0.01
-      weight_decay: 0.010
+      lr: 0.10
+      weight_decay: 0.0001

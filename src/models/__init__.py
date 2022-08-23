@@ -23,12 +23,14 @@ def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
     """
     if hyperparams['model'] == "APPNP":
         return APPNP(**hyperparams)
-    if hyperparams['model'] == 'DenseGCN':
+    if hyperparams['model'] == "DenseGCN":
         return DenseGCN(**hyperparams)
     if hyperparams['model'] == "GAT":
         return GAT(**hyperparams)
-    if hyperparams['model'] == 'GCN':
+    if hyperparams['model'] == "GCN":
         return GCN(**hyperparams)
+    if hyperparams['model'] is None:
+        return None
     if hyperparams['model'] == "SGC":
         return SGC(**hyperparams)
     raise ValueError("Specified model not found.")
