@@ -193,10 +193,15 @@ def train_inductive(
                 acc_val [epochs], 
                 epochs: training epochs (1-based)
     """
-    assert model is not None or label_prop is not None
+    if model is None:
+        return train_transductive(None, label_prop, X, A, y, split_trn, 
+                                  split_val, train_params, verbosity_params, 
+                                  _run)
 
     train_tracker = TrainingTracker(model, verbosity_params, _run=_run)
-
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=train_params["lr"], 
+                                    weight_decay=train_params["weight_decay"])
     loss = nn.CrossEntropyLoss()
 
     X_trn = X[split_trn, :]
@@ -204,54 +209,43 @@ def train_inductive(
     A_trn = A_trn[:,split_trn]
     y_trn = y[split_trn]
 
-    if model is None:
-        # Only Label Prop. achieves best result after one epoch (no training)
-        logits = label_prop.smooth(None, y_trn, split_trn, A, normalize=False)
-        loss_val = loss(logits[split_val], y[split_val])
-        acc_val = accuracy(logits, y, split_val)
-        train_tracker.update(-1, loss_val, -1, acc_val)
-    else:
-        optimizer = torch.optim.Adam(model.parameters(), lr=train_params["lr"], 
-                                     weight_decay=train_params["weight_decay"])
+    for epoch in range(train_params["max_epochs"]):
+        model.train()
+        optimizer.zero_grad()
 
-        for epoch in range(train_params["max_epochs"]):
-            model.train()
-            optimizer.zero_grad()
+        logits = model(X_trn, A_trn)
+        loss_train = loss(logits, y_trn)
+        acc_trn = accuracy(logits, y_trn)
 
-            logits = model(X_trn, A_trn)
-            loss_train = loss(logits, y_trn)
-            acc_trn = accuracy(logits, y_trn)
+        with torch.no_grad():
+            model.eval()
+            logits = model(X, A)
+            if label_prop is not None:
+                logits = label_prop.smooth(logits, y_trn, split_trn, A)
+            loss_val = loss(logits[split_val], y[split_val])
+            acc_val = accuracy(logits, y, split_val)
 
-            with torch.no_grad():
-                model.eval()
-                logits = model(X, A)
-                if label_prop is not None:
-                    logits = label_prop.smooth(logits, y_trn, split_trn, A)
-                loss_val = loss(logits[split_val], y[split_val])
-                acc_val = accuracy(logits, y, split_val)
-
-            loss_train.backward()
-            optimizer.step()
-            
-            train_tracker.update(loss_train.detach().item(), 
-                                loss_val.detach().item(),
-                                acc_trn, acc_val)
-                                
-            if epoch >= train_tracker.best_epoch + train_params["patience"]:
-                break
+        loss_train.backward()
+        optimizer.step()
+        
+        train_tracker.update(loss_train.detach().item(), 
+                            loss_val.detach().item(),
+                            acc_trn, acc_val)
+                            
+        if epoch >= train_tracker.best_epoch + train_params["patience"]:
+            break
                 
     train_tracker.log_best_epoch()
 
     train_tracker.print_best_epoch()
 
-    if model is not None:
-        model.load_state_dict(train_tracker.get_best_model_state())
+    model.load_state_dict(train_tracker.get_best_model_state())
     return train_tracker
 
 
 @typechecked
 def train_transductive(
-        model: nn.Module, 
+        model: Optional[nn.Module], 
         label_prop: Optional[LP],
         X: TensorType["n", "d"], 
         A: TensorType["n", "n"], 
@@ -268,6 +262,9 @@ def train_transductive(
 
     Args:
         model (nn.Module): Initialized model to train.
+        label_prop (Optional[nn.Module]): Label Propagation Module applied on 
+            top of model-predictions. Can be disabled by setting to None or 
+            used as stand-alone if model is set to None.
         X (TensorType["n", "d"]): Graph feature matrix.
         A (TensorType["n", "n"]): Adjacency matrix.
         y (TensorType["n"]): Node labels.
@@ -294,37 +291,50 @@ def train_transductive(
                 acc_val [epochs], 
                 epochs: training epochs (1-based)
     """
-    train_tracker = TrainingTracker(model, verbosity_params, _run=_run)
+    assert model is not None or label_prop is not None
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=train_params["lr"], 
-                                 weight_decay=train_params["weight_decay"])
+    train_tracker = TrainingTracker(model, verbosity_params, _run=_run)
 
     loss = nn.CrossEntropyLoss()
 
-    for epoch in range(train_params["max_epochs"]):
-        model.train()
-        optimizer.zero_grad()
-
-        logits = model(X, A)
-        loss_train = loss(logits[split_trn], y[split_trn])
+    if model is None:
+        # Label Propagation achieves best result after one epoch (no training)
+        logits = label_prop.smooth(None, y[split_trn], split_trn, A, 
+                                   normalize=False)
         loss_val = loss(logits[split_val], y[split_val])
-
-        loss_train.backward()
-        optimizer.step()
-
-        acc_trn = accuracy(logits, y, split_trn)
         acc_val = accuracy(logits, y, split_val)
+        train_tracker.update(-1, loss_val, -1, acc_val)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=train_params["lr"], 
+                                    weight_decay=train_params["weight_decay"])
 
-        train_tracker.update(loss_train.detach().item(), 
-                             loss_val.detach().item(),
-                             acc_trn, acc_val)
-                             
-        if epoch >= train_tracker.best_epoch + train_params["patience"]:
-            break
-            
+        for epoch in range(train_params["max_epochs"]):
+            model.train()
+            optimizer.zero_grad()
+
+            logits = model(X, A)
+            if label_prop is not None:
+                logits = label_prop.smooth(logits, y[split_trn], split_trn, A)
+            loss_train = loss(logits[split_trn], y[split_trn])
+            loss_val = loss(logits[split_val], y[split_val])
+
+            loss_train.backward()
+            optimizer.step()
+
+            acc_trn = accuracy(logits, y, split_trn)
+            acc_val = accuracy(logits, y, split_val)
+
+            train_tracker.update(loss_train.detach().item(), 
+                                loss_val.detach().item(),
+                                acc_trn, acc_val)
+                                
+            if epoch >= train_tracker.best_epoch + train_params["patience"]:
+                break
+                
     train_tracker.log_best_epoch()
 
     train_tracker.print_best_epoch()
 
-    model.load_state_dict(train_tracker.get_best_model_state())
+    if model is not None:
+        model.load_state_dict(train_tracker.get_best_model_state())
     return train_tracker

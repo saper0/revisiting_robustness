@@ -3,10 +3,11 @@ from typing import Any, Dict, Union
 from src.models.appnp import APPNP
 from src.models.gat import GAT
 from src.models.gcn import GCN, DenseGCN
+from src.models.lp import LP
 from src.models.sgc import SGC
 
 
-MODEL_TYPE = Union[APPNP, DenseGCN, GAT, GCN, SGC]
+MODEL_TYPE = Union[APPNP, DenseGCN, GAT, GCN, SGC, None]
 
         
 def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
@@ -40,5 +41,6 @@ __all__ = [GCN,
            APPNP,
            GAT,
            DenseGCN,
+           LP,
            create_model,
            MODEL_TYPE]

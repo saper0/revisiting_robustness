@@ -3,7 +3,6 @@ This experiment implements only training a model on a synthetic graph for
 hyperparameter optimization.
 """
 import logging
-import os
 from typing import Any, Dict, Union, Optional
 
 import numpy as np
@@ -13,10 +12,8 @@ from sacred.run import Run
 import torch
 
 from src.data import split
-from src.eval import evaluate_robustness
 from src.graph_models import create_graph_model
-from src.models import create_model
-from src.models.lp import LP
+from src.models import create_model, LP
 from src.train import train_inductive, train_transductive
 
 try:
