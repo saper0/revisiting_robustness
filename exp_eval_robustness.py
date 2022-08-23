@@ -10,7 +10,7 @@ import torch
 from src.data import split
 from src.eval import evaluate_robustness
 from src.graph_models import create_graph_model
-from src.models import create_model
+from src.models import create_model, LP
 from src.train import train_inductive, train_transductive
 
 try:
@@ -73,6 +73,7 @@ def config():
         model="DenseGCN",
         n_filters=64,
         dropout=0.5,
+        use_label_propagation=False,
     )
 
     train_params = dict(
@@ -244,7 +245,14 @@ def run(data_params: Dict[str, Any],
     model_params_trn = dict(**model_params, 
                             n_features=X_np.shape[1], 
                             n_classes=data_params["classes"])
-    model = create_model(model_params_trn).to(device)
+    model = create_model(model_params_trn)
+    if model is not None:
+        model = model.to(device)
+    label_prop = None
+    if model_params["use_label_propagation"]:
+        label_prop = LP(model_params["lp_layers"], 
+                        model_params["lp_alpha"], 
+                        data_params["classes"]).to(device)
     #logging.info(model)
 
     # Train Model
@@ -252,11 +260,16 @@ def run(data_params: Dict[str, Any],
         train = train_inductive
     else:
         train = train_transductive
-    train_tracker = train(model, X, A, y, split_trn, split_val, train_params,
-                          verbosity_params, _run)
+    if model is not None:
+        lp_in_training = None
+    else:
+        lp_in_training = label_prop
+    train_tracker = train(model, lp_in_training, X, A, y, split_trn, split_val, 
+                          train_params, verbosity_params, _run)
 
     # Robustness Evaluation
     results_dict = evaluate_robustness(model, 
+                                       label_prop,
                                        graph_model, 
                                        X_np, A_np, y_np,
                                        data_params["inductive_samples"], 

@@ -1,10 +1,15 @@
 from typing import Optional, Union
 
 import numpy as np
+import torch.nn as nn
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 
+from src.models import LP
+
+
 patch_typeguard()
+
 
 @typechecked
 def accuracy(logits: TensorType["n", "c"], labels: TensorType["n"], 

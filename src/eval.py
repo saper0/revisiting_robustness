@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -7,9 +7,11 @@ import torch.nn as nn
 
 from src.attacks import create_attack
 from src.graph_models import GRAPH_MODEL_TYPE
+from src.models import LP
 from src.utils import accuracy
 
-def evaluate_robustness(model: nn.Module, 
+def evaluate_robustness(model: Optional[nn.Module], 
+                        label_prop: Optional[LP],
                         graph_model: GRAPH_MODEL_TYPE, 
                         X_np: np.ndarray, 
                         A_np: np.ndarray, 
@@ -27,7 +29,11 @@ def evaluate_robustness(model: nn.Module,
         - Robustness w.r.t. Bayes Classifier
 
     Args:
-        model (nn.Model): Node-classifier to investigation.
+        model (Optional[nn.Model]): Node-classifier to investigation. If not
+            provided, label propagation has to be enabled.
+        label_prop (Optional[nn.Module]): Label Propagation Module applied on 
+            top of model-predictions. Can be disabled by setting to None or 
+            used as stand-alone if model is set to None.
         graph_model (GRAPH_MODEL_TYPE): Generative graph model.
         X_np (np.ndarray, [n x d]): Feature matrix (assumed to be known during 
             training).
@@ -61,6 +67,7 @@ def evaluate_robustness(model: nn.Module,
                 robustness are returned (all calculated using the above
                 raw-data dicts)
     """
+    assert model is not None or label_prop is not None
     # Statistics Regarding Bayes & GNN Predictions
     c_acc_bayes = 0 # Count nodes correctly classified by bayes classifier
     c_acc_bayes_deg = Counter()  # Above but for each degree
@@ -93,7 +100,8 @@ def evaluate_robustness(model: nn.Module,
                                  # w.r.t. BC
 
     n = y_np.size
-    model.eval()
+    if model is not None:
+        model.eval()
     for i in range(inductive_samples):
         # ToDo: Create empty X, A, y templates & always only fill last row
         X, A, y = graph_model.sample_conditional(1, X_np, A_np, y_np)
@@ -115,7 +123,15 @@ def evaluate_robustness(model: nn.Module,
         X_gpu = torch.tensor(X, dtype=torch.float32, device=device)
         A_gpu = torch.tensor(A, dtype=torch.float32, device=device)
         y_gpu = torch.tensor(y, device=device)
-        logits = model(X_gpu, A_gpu)
+        if model is not None:
+            logits = model(X_gpu, A_gpu)
+            normalize = True
+        else:
+            logits = None
+            normalize = False
+        if label_prop is not None:
+            logits = label_prop.smooth(logits, y_gpu[:n], [i for i in range(n)], 
+                                       A_gpu, normalize)
         gnn_separable = round(accuracy(logits, y_gpu, n))
         # Statistics Prediction
         if gnn_separable:
@@ -168,7 +184,16 @@ def evaluate_robustness(model: nn.Module,
                         c_bayes_robust_when_both[deg_n].append(c_robustness)
             # Robustness of GNN
             if gnn_separable:
-                logits = model(X_gpu, A_gpu)
+                if model is not None:
+                    logits = model(X_gpu, A_gpu)
+                    normalize = True
+                else:
+                    logits = None
+                    normalize = False
+                if label_prop is not None:
+                    logits = label_prop.smooth(logits, y_gpu[:n], 
+                                               [i for i in range(n)], 
+                                               A_gpu, normalize)
                 gnn_separable_new = round(accuracy(logits, y_gpu, n))
                 if not gnn_separable_new or adv_edge is None:
                     if deg_n not in c_gnn_robust:
