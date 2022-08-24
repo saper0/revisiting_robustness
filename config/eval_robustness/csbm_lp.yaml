@@ -1,0 +1,80 @@
+seml:
+  name: eval_robustness_lp
+  executable: exp_eval_robustness.py
+  project_root_dir: ../../
+  output_dir: log/eval_robustness/
+
+slurm:
+  experiments_per_job: 1
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 10G          # memory
+    cpus-per-task: 4  # num cores
+    time: 0-00:30     # max time, D-HH:MM
+
+fixed:
+  model_params:
+    label: LP
+    model: None
+    use_label_propagation: True
+    lp_layers: 50
+    lp_alpha: 0.7
+    lp_use_clamping: False
+
+  data_params:
+    inductive_samples: 1000
+  
+  train_params:
+    inductive: True
+
+grid:
+  attack_params:
+    attack: 
+      type: choice
+      options:
+      - "l2"
+      - "random"
+  
+  seed:
+    type: choice
+    options:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 42
+
+K01:
+  fixed:
+    data_params:
+      K: 0.1
+
+K05:
+  fixed:
+    data_params:
+      K: 0.5
+
+K1:
+  fixed:
+    data_params:
+      K: 1.0
+
+K15:
+  fixed:
+    data_params:
+      K: 1.5
+
+K2:
+  fixed:
+    data_params:
+      K: 2.0
+
+K5:
+  fixed:
+    data_params:
+      K: 5.0

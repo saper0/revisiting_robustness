@@ -1,0 +1,131 @@
+seml:
+  name: eval_robustness_appnp_lp
+  executable: exp_eval_robustness.py
+  project_root_dir: ../../
+  output_dir: log/eval_robustness
+
+slurm:
+  experiments_per_job: 1
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 10G          # memory
+    cpus-per-task: 4  # num cores
+    time: 0-00:30     # max time, D-HH:MM
+
+fixed:
+
+  model_params:
+    label: APPNP+LP
+    model: APPNP
+    n_hidden: 64
+    K: 10
+    use_label_propagation: True
+    lp_layers: 50
+    lp_alpha: 0.7
+    lp_use_clamping: False
+
+  data_params:
+    inductive_samples: 1000
+  
+  train_params:
+    inductive: True
+
+grid:
+  attack_params:
+    attack: 
+      type: choice
+      options:
+      - "l2"
+      - "random"
+  
+  seed:
+    type: choice
+    options:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 42
+
+K01:
+  fixed:
+    data_params:
+      K: 0.1
+
+    model_params:
+      dropout: 0.0
+      alpha: 0.05
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.001
+
+K05:
+  fixed:
+    data_params:
+      K: 0.5
+
+    model_params:
+      dropout: 0.0
+      alpha: 0.05
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.001
+
+K1:
+  fixed:
+    data_params:
+      K: 1.0
+
+    model_params:
+      dropout: 0.0
+      alpha: 0.05
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.001
+
+K15:
+  fixed:
+    data_params:
+      K: 1.5
+
+    model_params:
+      dropout: 0.0
+      alpha: 0.10
+
+    train_params:
+      lr: 0.01
+      weight_decay: 0.001
+
+K2:
+  fixed:
+    data_params:
+      K: 2.0
+
+    model_params:
+      dropout: 0.0
+      alpha: 0.20
+
+    train_params:
+      lr: 0.01
+      weight_decay: 0.010
+
+K5:
+  fixed:
+    data_params:
+      K: 5.0
+
+    model_params:
+      dropout: 0.0
+      alpha: 0.20
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.010
