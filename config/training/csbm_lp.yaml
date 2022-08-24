@@ -21,6 +21,7 @@ fixed:
     model: None
     use_label_propagation: True
     lp_layers: 50
+    lp_use_clamping: False
 
 grid:
   data_params:
@@ -28,11 +29,11 @@ grid:
       type: choice
       options:
         - 0.1
-        - 0.5
-        - 1
-        - 1.5
-        - 2
-        - 5
+        #- 0.5 Different K don't matter
+        #- 1
+        #- 1.5
+        #- 2
+        #- 5
 
   model_params:
     lp_alpha:

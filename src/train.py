@@ -95,7 +95,6 @@ class TrainingTracker():
         self.log(self.epoch)
 
     def log_best_epoch(self):
-        """Log most recently added statistics."""
         self.log(self.best_epoch)
 
     def _add(self, loss_trn, loss_val, acc_trn, acc_val):
@@ -301,9 +300,13 @@ def train_transductive(
         # Label Propagation achieves best result after one epoch (no training)
         logits = label_prop.smooth(None, y[split_trn], split_trn, A, 
                                    normalize=False)
+        loss_train = loss(logits[split_trn], y[split_trn])
         loss_val = loss(logits[split_val], y[split_val])
+        acc_trn = accuracy(logits, y, split_trn)
         acc_val = accuracy(logits, y, split_val)
-        train_tracker.update(-1, loss_val.detach().item(), -1, acc_val)
+        #train_tracker.update(-1, loss_val.detach().item(), -1, acc_val)
+        train_tracker.update(loss_train.detach().item(), 
+                             loss_val.detach().item(), acc_trn, acc_val)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=train_params["lr"], 
                                     weight_decay=train_params["weight_decay"])
@@ -337,4 +340,67 @@ def train_transductive(
 
     if model is not None:
         model.load_state_dict(train_tracker.get_best_model_state())
+    return train_tracker
+
+
+@typechecked
+def test(
+        model: Optional[nn.Module], 
+        label_prop: Optional[LP],
+        X: TensorType["n", "d"], 
+        A: TensorType["n", "n"], 
+        y: TensorType["n"], 
+        split_trn: np.ndarray, 
+        split_val: np.ndarray,
+        _run: Optional[Run]=None
+) -> TrainingTracker:
+    """Test and log given model and/or label propagation on given graph.
+
+    Args:
+        model (nn.Module): Initialized model to train.
+        label_prop (Optional[nn.Module]): Label Propagation Module applied on 
+            top of model-predictions. Can be disabled by setting to None or 
+            used as stand-alone if model is set to None.
+        X (TensorType["n", "d"]): Graph feature matrix.
+        A (TensorType["n", "n"]): Adjacency matrix.
+        y (TensorType["n"]): Node labels.
+        split_trn (np.ndarray): Ids of training nodes.
+        split_val (np.ndarray): Ids of validation nodes.
+        _run (Optional[Run], optional): If set will be used to log statistics
+            using sacred. Defaults to None.
+
+    Returns:
+        Tuple[List[float], List[float], List[float], List[float], int]: 
+            Elements:
+                loss_trn [epochs]: [-1] because test() does not train
+                loss_val [epochs]: Validation loss on validation nodes.
+                acc_trn [epochs]: [-1] because test() does not train
+                acc_val [epochs]: Validation accuracy on validation nodes.
+                epochs: 1 because no training is performed
+    """
+    assert model is not None or label_prop is not None
+
+    train_tracker = TrainingTracker(model, {"display_steps": 1}, _run=_run)
+
+    loss = nn.CrossEntropyLoss()
+
+    if model is None:
+        logits = label_prop.smooth(None, y[split_trn], split_trn, A, 
+                                   normalize=False)
+        loss_train = loss(logits[split_trn], y[split_trn])
+        loss_val = loss(logits[split_val], y[split_val])
+        acc_trn = accuracy(logits, y, split_trn)
+        acc_val = accuracy(logits, y, split_val)
+    else:
+        model.eval()
+        logits = model(X, A)
+        if label_prop is not None:
+            logits = label_prop.smooth(logits, y[split_trn], split_trn, A)
+        loss_train = loss(logits[split_trn], y[split_trn])
+        loss_val = loss(logits[split_val], y[split_val])
+        acc_trn = accuracy(logits, y, split_trn)
+        acc_val = accuracy(logits, y, split_val)
+
+    train_tracker.update(loss_train.detach().item(), loss_val.detach().item(), 
+                         acc_trn, acc_val)
     return train_tracker

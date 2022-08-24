@@ -1,7 +1,7 @@
 # Label Propagation implementation with Code & Comments mainly taken from 
 # PyTorch Geometric implementation of the Correct and Smooth Framework:
 # https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/models/correct_and_smooth.html #noqa
-from typing import Optional, List, Union
+from typing import Callable, List, Union
 
 import numpy as np
 import torch
@@ -43,13 +43,15 @@ class LP(torch.nn.Module):
         alpha (float): The :math:`\alpha` coefficient.
         num_classes (int): The number of different classes.
     """
-    def __init__(self, num_layers: int, alpha: float, num_classes: int):
+    def __init__(self, num_layers: int, alpha: float, num_classes: int,
+                 post_step: Callable = lambda y: y.clamp_(0., 1.)):
         super().__init__()
         self.num_layers = num_layers
         self.alpha = alpha
         self.prop = LabelPropagation(num_layers, alpha)
         self.softmax = torch.nn.Softmax(dim=1)
         self.num_classes = num_classes
+        self.post_step = post_step
 
     @typechecked
     def smooth(self, 
@@ -91,7 +93,8 @@ class LP(torch.nn.Module):
         y_soft[mask] = y_true
 
         edge_index = A.nonzero().t()
-        return self.prop(y_soft, edge_index, edge_weight=None)
+        return self.prop(y_soft, edge_index, edge_weight=None, 
+                         post_step=self.post_step)
 
     def __repr__(self):
         return (f'{self.__class__.__name__}(\n'

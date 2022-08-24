@@ -217,9 +217,14 @@ def run(data_params: Dict[str, Any],
         model = model.to(device)
     lp = None
     if model_params["use_label_propagation"]:
+        if model_params["lp_use_clamping"]:
+            post_step = lambda y: y.clamp_(0, 1)
+        else:
+            post_step = lambda y: y
         lp = LP(model_params["lp_layers"], 
                 model_params["lp_alpha"], 
-                data_params["classes"]).to(device)
+                data_params["classes"],
+                post_step).to(device)
     #logging.info(model)
 
     # Train Model

@@ -11,7 +11,7 @@ from src.data import split
 from src.eval import evaluate_robustness
 from src.graph_models import create_graph_model
 from src.models import create_model, LP
-from src.train import train_inductive, train_transductive
+from src.train import train_inductive, train_transductive, test
 
 try:
     import seml
@@ -250,9 +250,14 @@ def run(data_params: Dict[str, Any],
         model = model.to(device)
     label_prop = None
     if model_params["use_label_propagation"]:
+        if model_params["lp_use_clamping"]:
+            post_step = lambda y: y.clamp_(0, 1)
+        else:
+            post_step = lambda y: y
         label_prop = LP(model_params["lp_layers"], 
                         model_params["lp_alpha"], 
-                        data_params["classes"]).to(device)
+                        data_params["classes"],
+                        post_step).to(device)
     #logging.info(model)
 
     # Train Model
@@ -261,11 +266,14 @@ def run(data_params: Dict[str, Any],
     else:
         train = train_transductive
     if model is not None:
+        # Train model independently from label propagation.
         lp_in_training = None
     else:
         lp_in_training = label_prop
     train_tracker = train(model, lp_in_training, X, A, y, split_trn, split_val, 
                           train_params, verbosity_params, _run)
+    logging.info("Testing Trained Model + Label Propagation if specified:")
+    test_tracker = test(model, label_prop, X, A, y, split_trn, split_val, _run)
 
     # Robustness Evaluation
     results_dict = evaluate_robustness(model, 
@@ -300,6 +308,10 @@ def run(data_params: Dict[str, Any],
         training_loss = train_tracker.get_training_loss(),
         validation_loss = train_tracker.get_validation_loss(),
         training_accuracy = train_tracker.get_training_accuracy(),
-        validation_accuracy = train_tracker.get_validation_accuracy()
+        validation_accuracy = train_tracker.get_validation_accuracy(),
+        final_training_loss = test_tracker.get_training_loss()[0],
+        final_training_accuracy = test_tracker.get_training_accuracy()[0],
+        final_validation_loss = test_tracker.get_validation_loss()[0],
+        final_validation_accuracy = test_tracker.get_validation_accuracy()[0]
     )
 
