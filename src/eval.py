@@ -105,7 +105,7 @@ def evaluate_robustness(model: Optional[nn.Module],
     for i in range(inductive_samples):
         # ToDo: Create empty X, A, y templates & always only fill last row
         X, A, y = graph_model.sample_conditional(1, X_np, A_np, y_np)
-        deg_n = np.sum(A[:,n])
+        deg_n = str(np.sum(A[:,n]))
         c_degree_total[deg_n] += 1
         # Statistics Bayes Classifier
         feature_separable, _ = graph_model.feature_separability(X, y, [n])
@@ -227,7 +227,6 @@ def evaluate_robustness(model: Optional[nn.Module],
     std_bayes_robust = {}
     max_bayes_robust = {}
     for degree in c_acc_bayes_deg:
-        degree = int(degree)
         avg_bayes_robust[f"{degree}"] = float(np.mean(c_bayes_robust[degree]))
         med_bayes_robust[f"{degree}"] = float(np.median(c_bayes_robust[degree]))
         std_bayes_robust[f"{degree}"] = float(np.std(c_bayes_robust[degree]))
@@ -237,7 +236,6 @@ def evaluate_robustness(model: Optional[nn.Module],
     std_gnn_robust = {}
     max_gnn_robust = {}
     for degree in c_acc_gnn_deg:
-        degree = int(degree)
         avg_gnn_robust[f"{degree}"] = float(np.mean(c_gnn_robust[degree]))
         med_gnn_robust[f"{degree}"] = float(np.median(c_gnn_robust[degree]))
         std_gnn_robust[f"{degree}"] = float(np.std(c_gnn_robust[degree]))
@@ -248,7 +246,6 @@ def evaluate_robustness(model: Optional[nn.Module],
     max_gnn_wrt_bayes_robust = {}
     # Robustness GNN w.r.t. Bayes
     for degree in c_acc_bayes_gnn_deg:
-        degree = int(degree)
         avg_gnn_wrt_bayes_robust[f"{degree}"] = float(np.mean(c_gnn_wrt_bayes_robust[degree]))
         med_gnn_wrt_bayes_robust[f"{degree}"] = float(np.median(c_gnn_wrt_bayes_robust[degree]))
         std_gnn_wrt_bayes_robust[f"{degree}"] = float(np.std(c_gnn_wrt_bayes_robust[degree]))
@@ -258,7 +255,6 @@ def evaluate_robustness(model: Optional[nn.Module],
     std_bayes_robust_when_both = {}
     max_bayes_robust_when_both = {}
     for degree in c_acc_bayes_gnn_deg:
-        degree = int(degree)
         avg_bayes_robust_when_both[f"{degree}"] = float(np.mean(c_bayes_robust_when_both[degree]))
         med_bayes_robust_when_both[f"{degree}"] = float(np.median(c_bayes_robust_when_both[degree]))
         std_bayes_robust_when_both[f"{degree}"] = float(np.std(c_bayes_robust_when_both[degree]))
@@ -268,7 +264,6 @@ def evaluate_robustness(model: Optional[nn.Module],
     std_gnn_robust_when_both = {}
     max_gnn_robust_when_both = {}
     for degree in c_acc_bayes_gnn_deg:
-        degree = int(degree)
         avg_gnn_robust_when_both[f"{degree}"] = float(np.mean(c_gnn_robust_when_both[degree]))
         med_gnn_robust_when_both[f"{degree}"] = float(np.median(c_gnn_robust_when_both[degree]))
         std_gnn_robust_when_both[f"{degree}"] = float(np.std(c_gnn_robust_when_both[degree]))
@@ -311,10 +306,10 @@ def evaluate_robustness(model: Optional[nn.Module],
                 std_gnn_robust_when_both=std_gnn_robust_when_both, 
                 max_gnn_robust_when_both=max_gnn_robust_when_both,
                 # Raw Degree-Dependent Robustness Data (For each Node)
-                c_bayes_robust=c_bayes_robust,
-                c_gnn_robust=c_gnn_robust,
-                c_gnn_wrt_bayes_robust=c_gnn_wrt_bayes_robust,
-                c_bayes_robust_when_both=c_bayes_robust_when_both,
-                c_gnn_robust_when_both=c_gnn_robust_when_both
+                c_bayes_robust=c_bayes_robust, #g|y
+                c_gnn_robust=c_gnn_robust, #f|y
+                c_gnn_wrt_bayes_robust=c_gnn_wrt_bayes_robust, # f|g
+                c_bayes_robust_when_both=c_bayes_robust_when_both, #g|y when g & f both correctly classified node
+                c_gnn_robust_when_both=c_gnn_robust_when_both #f|y when g & f both correctly classified node
             )
     )
