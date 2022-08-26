@@ -2,7 +2,7 @@ seml:
   name: eval_robustness_gcn
   executable: exp_eval_robustness.py
   project_root_dir: ../
-  output_dir: log
+  output_dir: log/
 
 slurm:
   experiments_per_job: 1
@@ -13,38 +13,37 @@ slurm:
     time: 0-00:30     # max time, D-HH:MM
 
 fixed:
+  model_params:
+    label: GCN
+    model: DenseGCN
+    n_filters: 64
+
   data_params:
-    inductive_samples: 100
+    inductive_samples: 1000
+  
+  train_params:
+    inductive: True
 
 grid:
-  data_params:
-    seed:
-      type: choice
-      options:
-        - 0
-        #- 1
-        #- 2
-        #- 3
-        #- 4
-        #- 5
-        #- 6
-        #- 7
-        #- 8
-        #- 42
-
-    K:
-      type: choice
-      options:
-        #- 0.1
-        - 0.5
-        #- 1
-        #- 1.5
-        #- 2
-        #- 5
-
   attack_params:
     attack: 
       type: choice
       options:
       - "l2"
-      #- "random"
+  
+  seed:
+    type: choice
+    options:
+      - 9
+
+K01:
+  fixed:
+    data_params:
+      K: 0.1
+
+    model_params:
+      dropout: 0.5
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.001

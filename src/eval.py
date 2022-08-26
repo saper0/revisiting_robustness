@@ -310,6 +310,7 @@ def evaluate_robustness(model: Optional[nn.Module],
                 c_gnn_robust=c_gnn_robust, #f|y
                 c_gnn_wrt_bayes_robust=c_gnn_wrt_bayes_robust, # f|g
                 c_bayes_robust_when_both=c_bayes_robust_when_both, #g|y when g & f both correctly classified node
-                c_gnn_robust_when_both=c_gnn_robust_when_both #f|y when g & f both correctly classified node
+                c_gnn_robust_when_both=c_gnn_robust_when_both, #f|y when g & f both correctly classified node
+                c_degree_total = dict(c_degree_total)
             )
     )
