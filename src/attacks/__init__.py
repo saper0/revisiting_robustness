@@ -24,7 +24,8 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
     Returns:
         ATTACK_TYPE: Initialized locl attack for a target node.
     """
-    if hyperparams["attack"] == "random" or hyperparams["attack"] == "l2":
+    if hyperparams["attack"] == "random" or hyperparams["attack"] == "l2" \
+        or hyperparams["attack"] == "l2-weak":
         return SimpleAttack(target_idx, X, A, y, **hyperparams)
     raise ValueError("Specified attack not found.")
 

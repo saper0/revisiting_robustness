@@ -23,6 +23,8 @@ class SimpleAttack(LocalAttack):
             return self.random_edge_candidates()
         if attack == "l2":
             return self.most_distant_edge_candidates()
+        if attack == "l2-weak":
+            return self.most_closest_edge_candidates()
         assert False, "Given attack method not implemented."
 
     def random_edge_candidates(self) -> np.ndarray:
@@ -42,6 +44,16 @@ class SimpleAttack(LocalAttack):
     def most_distant_edge_candidates(self) -> np.ndarray:
         """Return list of nodes of different class in order of decreasing 
         l2-distance."""
+        return self.l2_edge_candidates(order="descending")
+
+    def most_closest_edge_candidates(self) -> np.ndarray:
+        """Return list of nodes of different class in order of increasing 
+        l2-distance."""
+        return self.l2_edge_candidates(order="ascending")
+
+    def l2_edge_candidates(self, order="descending") -> np.ndarray:
+        """Return list of nodes of different class in order of descending 
+        (decreasing) or ascending (increasing) l2-distance."""
         y, n_idx = self.y, self.target
         n = y.shape[0]
         if y[n_idx] == 0:
@@ -51,8 +63,13 @@ class SimpleAttack(LocalAttack):
         X_diff = self.X[n_idx,:] - self.X[pot_neighbours,:]
         X_dist = np.linalg.norm(X_diff, ord=2, axis=1)
         idx_ascending = np.argsort(X_dist)
-        idx_descending = np.flip(idx_ascending)
-        return pot_neighbours[idx_descending]
+        if order == "ascending":
+            return pot_neighbours[idx_ascending]
+        if order == "descending":
+            idx_descending = np.flip(idx_ascending)
+            return pot_neighbours[idx_descending]
+        raise ValueError(f"Specified l2 candidate order must be descending or "
+                         f"ascending but {order} given.")
 
     def create_adversarial_pert(self) -> Tuple[int, int]:
         """Add an adversarial edge to the stored graph.

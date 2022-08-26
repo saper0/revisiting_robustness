@@ -32,8 +32,9 @@ grid:
     attack: 
       type: choice
       options:
-      - "l2"
-      - "random"
+      #- "l2"
+      #- "random"
+      - "l2-weak"
   
   seed:
     type: choice

@@ -1,7 +1,7 @@
 seml:
-  name: eval_robustness_gcn
-  executable: exp_eval_robustness.py
-  project_root_dir: ../
+  name: gat
+  executable: exp_train.py
+  project_root_dir: ../../
   output_dir: log/
 
 slurm:
@@ -13,10 +13,12 @@ slurm:
     time: 0-00:30     # max time, D-HH:MM
 
 fixed:
+
   model_params:
-    label: GCN
-    model: DenseGCN
-    n_filters: 64
+    label: GAT
+    model: GAT
+    n_heads: 8
+    n_features_per_head: 8
 
   data_params:
     inductive_samples: 1000
@@ -25,16 +27,20 @@ fixed:
     inductive: True
 
 grid:
-  attack_params:
-    attack: 
-      type: choice
-      options:
-      - "l2-weak"
   
   seed:
     type: choice
     options:
-      - 9
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 42
 
 K01:
   fixed:
@@ -42,8 +48,9 @@ K01:
       K: 0.1
 
     model_params:
-      dropout: 0.5
+      dropout: 0.0
+      dropout_neighbourhood: 0.0
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.001
+      lr: 0.10
+      weight_decay: 0.0001

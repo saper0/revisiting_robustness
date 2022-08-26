@@ -132,10 +132,11 @@ class Experiment:
         self.std_validation_loss = np.std(final_validation_loss_l)
         self.avg_validation_accuracy = np.mean(final_validation_accuracy_l)
         self.std_validation_accuracy = np.std(final_validation_accuracy_l)
-        print(f"{self.label} on K={self.K} has {self.avg_training_accuracy*100:.1f}"
-              f"+-{self.std_training_accuracy*100:.1f}% trn acc and "
-              f"{self.avg_validation_accuracy*100:.1f}+-{self.std_validation_accuracy*100:.1f}%"
-              f" val acc.")
+        if False:
+            print(f"{self.label} on K={self.K} has {self.avg_training_accuracy*100:.1f}"
+                f"+-{self.std_training_accuracy*100:.1f}% trn acc and "
+                f"{self.avg_validation_accuracy*100:.1f}+-{self.std_validation_accuracy*100:.1f}%"
+                f" val acc.")
 
                 
     def calculate_robustness_metrics(self):
