@@ -1,6 +1,9 @@
 from pymongo import MongoClient
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Iterator, List, Tuple, Union
 
+from cycler import cycler
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 import pandas as pd
 
@@ -53,6 +56,7 @@ def average_dict(target: Dict[str, Any]):
             target["avg_" + key] = np.mean(item)
             target["std_" + key] = np.std(item)
 
+
 def average_subdict(subdict: Dict[str, Any]):
     """Return a dictionary with averaged and a dictionary with standard deviation
     values for each element."""
@@ -78,6 +82,7 @@ class Experiment:
         self.hyperparameters = experiment_list[0]["config"]
         self.label = self.hyperparameters["model_params"]["label"]
         self.K = self.hyperparameters["data_params"]["K"]
+        self.attack = self.hyperparameters["attack_params"]["attack"]
         Experiment.assert_same_hyperparameters(self.individual_experiments)
         self.average_result_statistics()
         self.calculate_robustness_metrics()
@@ -129,6 +134,10 @@ class Experiment:
         self.avg_training_accuracy = np.mean(final_training_accuracy_l)
         self.std_training_accuracy = np.std(final_training_accuracy_l)
         self.avg_validation_loss = np.mean(final_validation_loss_l)
+        if self.label=="APPNP" and False:
+            print(f"K: {self.K}")
+            print(final_validation_accuracy_l)
+            print(final_validation_loss_l)
         self.std_validation_loss = np.std(final_validation_loss_l)
         self.avg_validation_accuracy = np.mean(final_validation_accuracy_l)
         self.std_validation_accuracy = np.std(final_validation_accuracy_l)
@@ -137,8 +146,7 @@ class Experiment:
                 f"+-{self.std_training_accuracy*100:.1f}% trn acc and "
                 f"{self.avg_validation_accuracy*100:.1f}+-{self.std_validation_accuracy*100:.1f}%"
                 f" val acc.")
-
-                
+          
     def calculate_robustness_metrics(self):
         self.count_zero_degree_nodes(verbose=False)
         self.measure_robustness(verbose=False)
@@ -167,7 +175,12 @@ class Experiment:
 
     def measure_robustness(self, verbose):
         """Calculate over-robustness metrics and average over seeds."""
+        rob_f_wrt_y_l = []
+        rob_g_wrt_y_l = []
+        rob_f_wrt_g_l = []
         over_robustness_l = []
+        min_changes_to_flip_overrob_l = []
+        min_changes_to_flip_advrob_l = []
         adv_robustness_l = []
         for experiment in self.individual_experiments:
             result = experiment["result"]
@@ -177,27 +190,95 @@ class Experiment:
             f_wrt_g = robustness_stats["c_gnn_wrt_bayes_robust"]
             over_robustness = 0
             adv_robustness = 0
+            rob_f_wrt_y = 0
+            rob_g_wrt_y = 0
+            rob_f_wrt_g = 0
+            min_changes_to_flip_overrob = 0
+            min_changes_to_flip_advrob = 0
             c_nodes = 0
             for deg in g_wrt_y:
                 if deg == "0":
                     continue
                 for g_wrt_y_i, f_wrt_y_i, f_wrt_g_i in \
                     zip(g_wrt_y[deg], f_wrt_y[deg], f_wrt_g[deg]):
+                    rob_f_wrt_y += f_wrt_y_i / int(deg)
+                    rob_g_wrt_y += g_wrt_y_i / int(deg)
+                    rob_f_wrt_g += f_wrt_g_i / int(deg)
                     over_robustness += (f_wrt_y_i - g_wrt_y_i) / int(deg)
                     adv_robustness += (g_wrt_y_i - f_wrt_g_i) / int(deg)
+                    min_changes_to_flip_overrob += (f_wrt_y_i + 1) / (g_wrt_y_i + 1)
+                    min_changes_to_flip_advrob += (f_wrt_g_i + 1) / (g_wrt_y_i + 1)
                 c_nodes += len(g_wrt_y[deg])
             over_robustness_l.append(over_robustness / c_nodes)
             adv_robustness_l.append(adv_robustness / c_nodes)
+            rob_f_wrt_y_l.append(rob_f_wrt_y / c_nodes)
+            rob_g_wrt_y_l.append(rob_g_wrt_y / c_nodes)
+            rob_f_wrt_g_l.append(rob_f_wrt_g / c_nodes)
+            min_changes_to_flip_overrob_l.append(min_changes_to_flip_overrob / c_nodes) 
+            min_changes_to_flip_advrob_l.append(min_changes_to_flip_advrob / c_nodes) 
+        if self.label == "APPNP" and False:
+            print(over_robustness_l)
+        # All Robustness Statistics Attributes
+        self.avg_robustness_f_wrt_y = np.mean(rob_f_wrt_y_l)
+        self.std_robustness_f_wrt_y = np.std(rob_f_wrt_y_l)
+        self.avg_robustness_g_wrt_y = np.mean(rob_g_wrt_y_l)
+        self.std_robustness_g_wrt_y = np.std(rob_g_wrt_y_l)
+        self.avg_robustness_f_wrt_g = np.mean(rob_f_wrt_g_l)
+        self.std_robustness_f_wrt_g = np.std(rob_f_wrt_g_l)
         self.avg_over_robustness = np.mean(over_robustness_l)
         self.std_over_robustness = np.std(over_robustness_l)
+        self.relative_over_robustness = self.avg_robustness_f_wrt_y / self.avg_robustness_g_wrt_y
+        # see https://www.geol.lsu.edu/jlorenzo/geophysics/uncertainties/Uncertaintiespart2.html#muldiv
+        self.std_relative_over_robustness = \
+            (self.std_robustness_f_wrt_y / self.avg_robustness_f_wrt_y 
+             + self.std_robustness_g_wrt_y / self.avg_robustness_g_wrt_y) \
+                * self.relative_over_robustness 
         self.avg_adv_robustness = np.mean(adv_robustness_l)
         self.std_adv_robustness = np.std(adv_robustness_l)
-        if self.hyperparameters["attack_params"]["attack"] == "random" and verbose:
-            print(f"{self.label} on K={self.K} has {self.avg_over_robustness:.2f}+-"
-                    f"{self.std_over_robustness:.2f} over-robustness")
-        if self.hyperparameters["attack_params"]["attack"] == "l2" and verbose:
-            print(f"{self.label} on K={self.K} has {self.avg_adv_robustness:.2f}+-"
-                    f"{self.std_adv_robustness:.2f} adv. robustness")
+        self.relative_adv_robustness = self.avg_robustness_f_wrt_g / self.avg_robustness_g_wrt_y
+        self.std_relative_adv_robustness = \
+            (self.std_robustness_f_wrt_g / self.avg_robustness_f_wrt_g
+             + self.std_robustness_g_wrt_y / self.avg_robustness_g_wrt_y) \
+                * self.relative_adv_robustness
+        self.avg_min_changes_to_flip_overrob = np.mean(min_changes_to_flip_overrob_l)
+        self.std_min_changes_to_flip_overrob = np.std(min_changes_to_flip_overrob_l)
+        self.avg_min_changes_to_flip_advrob = np.mean(min_changes_to_flip_advrob_l)
+        self.std_min_changes_to_flip_advrob = np.std(min_changes_to_flip_advrob_l)
+      
+
+    def get_measurement(self, name: str) -> Tuple[float, float]:
+        """Return tuple: averaged measurement, std-measurement."""
+        if name == "over-robustness":
+            return self.avg_over_robustness.item(), self.std_over_robustness.item()
+        if name == "relative-over-robustness":
+            return self.relative_over_robustness.item(), self.std_relative_over_robustness.item()
+        if name == "f_wrt_y":
+            return self.avg_robustness_f_wrt_y.item(), self.std_robustness_f_wrt_y.item()
+        if name == "g_wrt_y":
+            return self.avg_robustness_g_wrt_y.item(), self.std_robustness_g_wrt_y.item()
+        if name == "f_wrt_g":
+            return self.avg_robustness_f_wrt_g.item(), self.std_robustness_f_wrt_g.item()
+        if name == "adversarial-robustness":
+            return self.avg_adv_robustness.item(), self.std_adv_robustness.item()
+        if name == "relative-adversarial-robustness":
+            return self.relative_adv_robustness.item(), self.std_adv_robustness.item()
+        if name == "validation-accuracy":
+            return self.avg_validation_accuracy.item(), self.std_validation_accuracy.item()
+        if name == "test-accuracy":
+            n = self.hyperparameters["data_params"]["inductive_samples"]
+            gnn_test_acc = self.prediction_statistics["avg_c_acc_gnn"] / n
+            gnn_test_acc_std = self.prediction_statistics["std_c_acc_gnn"] / n
+            return gnn_test_acc, gnn_test_acc_std
+        if name == "test-accuracy-bayes":
+            n = self.hyperparameters["data_params"]["inductive_samples"]
+            bayes_test_acc = self.prediction_statistics["avg_c_acc_bayes"] / n
+            bayes_test_acc_std = self.prediction_statistics["std_c_acc_bayes"] / n
+            return bayes_test_acc, bayes_test_acc_std
+        if name == "relative-changes-to-flip-overrobust":
+            return self.avg_min_changes_to_flip_overrob, self.std_min_changes_to_flip_overrob
+        if name == "relative-changes-to-flip-advrobust":
+            return self.avg_min_changes_to_flip_advrob, self.std_min_changes_to_flip_advrob
+
 
 class ExperimentManager:
     """Administrates access and visualization of robustness experiments.
@@ -258,6 +339,196 @@ class ExperimentManager:
                                              exp_spec["n_seeds"],
                                              exp_spec["label"])
             for exp in exp_list:
-                if exp.label not in self.experiments_dict:
-                    self.experiments_dict[exp.label] = {}
-                self.experiments_dict[exp.label][exp.K] = exp
+                if exp.attack not in self.experiments_dict:
+                    self.experiments_dict[exp.attack] = {}
+                if exp.label not in self.experiments_dict[exp.attack]:
+                    self.experiments_dict[exp.attack][exp.label] = {}
+                self.experiments_dict[exp.attack][exp.label][exp.K] = exp
+
+    def get_robustness_table(self, attack: str, models: List[str], 
+                             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
+        """Return data-frame with individual robustnesses as well as over-
+        robustness and normal robustness metric."""
+        exp_l = []
+        for label, K, exp in self.experiment_iterator(attack, models, K_l):
+            key = (label, str(K))
+            row = [
+                f"{exp.avg_robustness_f_wrt_y:.2f}+-{exp.std_robustness_f_wrt_y:.2f}",
+                f"{exp.avg_robustness_g_wrt_y:.2f}+-{exp.std_robustness_g_wrt_y:.2f}",
+                f"{exp.avg_over_robustness:.2f}+-{exp.std_over_robustness:.2f}",
+                #f"{exp.avg_robustness_f_wrt_y / exp.avg_robustness_g_wrt_y * 100:.2f}",
+                f"{exp.relative_over_robustness:.2f}+-{exp.std_relative_over_robustness:.2f}",
+                f"{exp.avg_min_changes_to_flip:.2f}+-{exp.std_min_changes_to_flip:.2f}",
+                f"{exp.avg_robustness_f_wrt_g:.2f}+-{exp.std_robustness_f_wrt_g:.2f}",
+                f"{exp.avg_adv_robustness:.2f}+-{exp.std_adv_robustness:.2f}",
+                #f"{exp.avg_robustness_f_wrt_g / exp.avg_robustness_g_wrt_y * 100:.2f}"
+                f"{exp.relative_adv_robustness:.2f}+-{exp.std_relative_adv_robustness:.2f}"
+            ]
+            exp_l.append((key, row))
+        columns = ["Rob_f|y", "Rob_g|y", "f|y-g|y", "f|y/g|y", "f|y+1/g|y+1", "Rob_f|g", "g|y-f|g", "f|g/g|y"]
+        f = pd.DataFrame.from_dict(dict(exp_l)).T
+        f.columns = columns
+        return f
+
+    def plot(self, name: str, attack: str, models: List[str], 
+             errorbars: bool=True, ylabel: str=None, title: str=None,
+             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
+        """Plot relative or absolute over-robustness measure.
+
+        Args:
+            name (str): What measurement to plot:
+                - over-robustness
+                - relative-over-robustness
+                - f_wrt_y (allows for BC model)
+                - adversarial-robustness
+                - relative-adversarial-robustness
+                - validation-accuracy
+                - test-accuracy
+            attack (str): 
+            models (List[str]): White-list
+            errorbars (bool): True or False
+            ylabel: Label of y-axis. If not provided it is set to "name".
+            title: Title of plot. If not provided it is set to "name".
+            K_l:List[float]=[0.1, 0.5, 1, 1.5, 2, 5]. White-list
+        """
+        fig, ax = plt.subplots()
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        linestyle_list = ['-', '--', ':', '-.']
+        ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
+                          cycler('color', color_list))
+        added_bayes = False
+        for label, exp_by_k in self.model_iterator(attack, models):
+            x = []
+            y = []
+            y_err = []
+            y_bc = []
+            y_err_bc = []
+            for K, exp in exp_by_k.items():
+                if K not in K_l:
+                    continue
+                x.append(K)
+                value, std = exp.get_measurement(name)
+                y.append(value)
+                y_err.append(std)
+                if "BC" in models and not added_bayes:
+                    if name == "f_wrt_y":
+                        value, std = exp.get_measurement("g_wrt_y")
+                    elif name == "test-accuracy":
+                        value, std = exp.get_measurement("test-accuracy-bayes")
+                    else:
+                        raise ValueError("BC requested but name not f_wrt_y")
+                    y_bc.append(value)
+                    y_err_bc.append(std)
+            if errorbars:
+                ax.errorbar(x, y, yerr=y_err, marker="o", label=label, capsize=3)
+                if "BC" in models and not added_bayes:
+                    ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", label="Bayes Classifier", capsize=3)
+            else:
+                ax.plot(x, y, marker="o", label=label)
+                if "BC" in models and not added_bayes:
+                    ax.plot(x, y_bc, "s:", label="Bayes Classifier")
+            added_bayes = True
+        if ylabel is None:
+            ylabel=name
+        ax.set_ylabel(ylabel)
+        if title is None:
+            title=name
+        ax.set_title(title)
+        ax.set_xticks(K_l, minor=False)
+        ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
+        ax.set_xlabel("K")
+        ax.set_xlim(left=0.)
+        ax.yaxis.grid()
+        ax.legend()
+        plt.show()
+
+    def plot_wrt_degree(self, name: str, attack: str, models: List[str], K: float,
+                        errorbars: bool=True, ylabel: str=None, title: str=None):
+        max_deg = 0
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+            max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
+            if max_deg_ > max_deg:
+                max_deg = max_deg_
+        
+        fig, axs = plt.subplots()
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        linestyle_list = ['-', '--', ':', '-.']
+        axs.set_prop_cycle(cycler('linestyle', linestyle_list)*
+                           cycler('color', color_list))
+        bayes_added = False
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            avg_f_wrt_y = exp.robustness_statistics["avg_avg_gnn_robust_when_both"]
+            std_f_wrt_y = exp.robustness_statistics["std_avg_gnn_robust_when_both"]
+            avg_g_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+            std_g_wrt_y = exp.robustness_statistics["std_avg_bayes_robust_when_both"]
+            avg_f_wrt_g = exp.robustness_statistics["avg_avg_gnn_wrt_bayes_robust"]
+            std_f_wrt_g = exp.robustness_statistics["std_avg_gnn_wrt_bayes_robust"]
+            
+            x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            ordered_avg_f_wrt_y = [avg_f_wrt_y[str(i)] for i in x]
+            ordered_std_f_wrt_y = [std_f_wrt_y[str(i)] for i in x]
+            ordered_avg_g_wrt_y = [avg_g_wrt_y[str(i)] for i in x]
+            ordered_std_g_wrt_y = [std_g_wrt_y[str(i)] for i in x]
+            ordered_avg_f_wrt_g = [avg_f_wrt_g[str(i)] for i in x]
+            ordered_std_f_wrt_g = [std_f_wrt_g[str(i)] for i in x]
+            if errorbars:
+                if name == "f_wrt_y" or name == "both":
+                    axs.errorbar(x, ordered_avg_f_wrt_y, 
+                                yerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3)
+                if not bayes_added:
+                    axs.errorbar(x, ordered_avg_g_wrt_y, 
+                                yerr=ordered_std_g_wrt_y, fmt="o:", label=f"Bayes", capsize=3)
+                if name == "f_wrt_g" or name == "both":
+                    axs.errorbar(x, ordered_avg_f_wrt_g, 
+                                yerr=ordered_std_f_wrt_g, marker="o", label=f"{label} w.r.t. Bayes", capsize=3)
+            else:
+                if name == "f_wrt_y" or name == "both":
+                    axs.plot(x, ordered_avg_f_wrt_y, marker='o', label=f"{label}")
+                if not bayes_added:
+                    axs.plot(x, ordered_avg_g_wrt_y, 'o:', label="Bayes")
+                if name == "f_wrt_g" or name == "both":
+                    axs.plot(x, ordered_avg_f_wrt_g, marker='o', label=f"{label} w.r.t. Bayes")
+            bayes_added = True
+        if ylabel is None:
+            ylabel=name
+        axs.set_ylabel(ylabel)
+        axs.set_xlabel("Degree")
+        if title is None:
+            title=name
+        axs.set_title(title)
+        axs.legend()
+        start_x, end_x = axs.get_xlim()
+        start_y, end_y = axs.get_ylim()
+        axs.xaxis.set_ticks(np.arange(0, end_x, step=1))
+        axs.yaxis.set_ticks(np.arange(0, end_y, step=1))
+        plt.grid()
+        plt.show()
+
+    def model_iterator(
+        self, attack: str, models: List[str]
+    ) -> Iterator[Tuple[str, Dict[float, Experiment]]]:
+        """Provide iterator over stored models of a specific attack.
+        
+        Returns a tuple with model-label and associated stored (K, Experiment)
+        pairs.
+        """
+        for attack_, exp_by_label in self.experiments_dict.items():
+            if attack_ != attack:
+                continue
+            for label, exp_by_k in exp_by_label.items():
+                if label not in models:
+                    continue
+                yield (label, exp_by_k)
+
+    def experiment_iterator(
+        self, attack: str, models: List[str], 
+        K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]
+    ) -> Iterator[Tuple[str, float, Experiment]]:
+        """Provide iterator over the requested experiments."""
+        for label, exp_by_k in self.model_iterator(attack, models):
+            for K, exp in exp_by_k.items():
+                if float(K) not in K_l:
+                    continue
+                yield (label, K, exp)
+
