@@ -182,6 +182,8 @@ class Experiment:
         min_changes_to_flip_overrob_l = []
         min_changes_to_flip_advrob_l = []
         adv_robustness_l = []
+        f1_robustness_l = []
+        f1_min_changes_l = []
         for experiment in self.individual_experiments:
             result = experiment["result"]
             robustness_stats = result["robustness_statistics"]
@@ -216,6 +218,14 @@ class Experiment:
             rob_f_wrt_g_l.append(rob_f_wrt_g / c_nodes)
             min_changes_to_flip_overrob_l.append(min_changes_to_flip_overrob / c_nodes) 
             min_changes_to_flip_advrob_l.append(min_changes_to_flip_advrob / c_nodes) 
+            # f1 robustness
+            Rover = min(rob_g_wrt_y_l[-1] / rob_f_wrt_y_l[-1], 1)
+            Radv = rob_f_wrt_g_l[-1] / rob_g_wrt_y_l[-1]
+            f1_robustness_l.append(2 * Rover * Radv / (Rover + Radv))
+            # f1 min changes
+            Rover = min((rob_g_wrt_y_l[-1] + 1)/(rob_f_wrt_y_l[-1] + 1), 1)
+            Radv = min_changes_to_flip_advrob_l[-1]
+            f1_min_changes_l.append(2 * Rover * Radv / (Rover + Radv))
         if self.label == "APPNP" and False:
             print(over_robustness_l)
         # All Robustness Statistics Attributes
@@ -244,8 +254,15 @@ class Experiment:
         self.std_min_changes_to_flip_overrob = np.std(min_changes_to_flip_overrob_l)
         self.avg_min_changes_to_flip_advrob = np.mean(min_changes_to_flip_advrob_l)
         self.std_min_changes_to_flip_advrob = np.std(min_changes_to_flip_advrob_l)
+        self.avg_f1_robustness = np.mean(f1_robustness_l)
+        self.std_f1_robustness = np.std(f1_robustness_l)
+        self.avg_f1_min_changes = np.mean(f1_min_changes_l)
+        self.std_f1_min_changes = np.std(f1_min_changes_l)
+        # Raw Robustness Metrics for each Seed:
+        self.rob_f_wrt_y_l = np.array(rob_f_wrt_y_l)
+        self.rob_g_wrt_y_l = np.array(rob_g_wrt_y_l)
+        self.rob_f_wrt_g_l = np.array(rob_f_wrt_g_l)
       
-
     def get_measurement(self, name: str) -> Tuple[float, float]:
         """Return tuple: averaged measurement, std-measurement."""
         if name == "over-robustness":
@@ -278,6 +295,10 @@ class Experiment:
             return self.avg_min_changes_to_flip_overrob, self.std_min_changes_to_flip_overrob
         if name == "relative-changes-to-flip-advrobust":
             return self.avg_min_changes_to_flip_advrob, self.std_min_changes_to_flip_advrob
+        if name == "f1-robustness":
+            return self.avg_f1_robustness, self.std_f1_robustness
+        if name == "f1-min-changes":
+            return self.avg_f1_min_changes, self.std_f1_min_changes
 
 
 class ExperimentManager:
@@ -384,6 +405,8 @@ class ExperimentManager:
                 - relative-adversarial-robustness
                 - validation-accuracy
                 - test-accuracy
+                - f1-robustness
+                - f1-min-changes
             attack (str): 
             models (List[str]): White-list
             errorbars (bool): True or False
@@ -442,8 +465,22 @@ class ExperimentManager:
         ax.legend()
         plt.show()
 
-    def plot_wrt_degree(self, name: str, attack: str, models: List[str], K: float,
+    def plot_wrt_degree(self, name: str, attack: str, models: List[str], K: List[float],
                         errorbars: bool=True, ylabel: str=None, title: str=None):
+        """Generate w.r.t. degree plots.
+
+        Args:
+            name (str):
+                - f_wrt_y
+                - f_wrt_g
+                - both
+            attack (str): _description_
+            models (List[str]): _description_
+            K (List[float]): _description_
+            errorbars (bool, optional): _description_. Defaults to True.
+            ylabel (str, optional): _description_. Defaults to None.
+            title (str, optional): _description_. Defaults to None.
+        """
         max_deg = 0
         for label, K, exp in self.experiment_iterator(attack, models, [K]):  
             avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
@@ -478,7 +515,7 @@ class ExperimentManager:
                                 yerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3)
                 if not bayes_added:
                     axs.errorbar(x, ordered_avg_g_wrt_y, 
-                                yerr=ordered_std_g_wrt_y, fmt="o:", label=f"Bayes", capsize=3)
+                                yerr=ordered_std_g_wrt_y, fmt="s:", label=f"Bayes", capsize=3)
                 if name == "f_wrt_g" or name == "both":
                     axs.errorbar(x, ordered_avg_f_wrt_g, 
                                 yerr=ordered_std_f_wrt_g, marker="o", label=f"{label} w.r.t. Bayes", capsize=3)
@@ -486,7 +523,7 @@ class ExperimentManager:
                 if name == "f_wrt_y" or name == "both":
                     axs.plot(x, ordered_avg_f_wrt_y, marker='o', label=f"{label}")
                 if not bayes_added:
-                    axs.plot(x, ordered_avg_g_wrt_y, 'o:', label="Bayes")
+                    axs.plot(x, ordered_avg_g_wrt_y, 's:', label="Bayes")
                 if name == "f_wrt_g" or name == "both":
                     axs.plot(x, ordered_avg_f_wrt_g, marker='o', label=f"{label} w.r.t. Bayes")
             bayes_added = True
@@ -503,6 +540,80 @@ class ExperimentManager:
         axs.xaxis.set_ticks(np.arange(0, end_x, step=1))
         axs.yaxis.set_ticks(np.arange(0, end_y, step=1))
         plt.grid()
+        plt.show()
+
+    def plot_f1(self, name: str, attack_overrobustness: str, attack_advrobustness: str,
+                models: List[str], errorbars: bool=True, 
+                label: str=None, title: str=None, ylabel: str=None, 
+                K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
+        """Plot f1 scores to trade of between over- and adv. robustness.
+
+        Args:
+            name (str): 
+                - f1-robustness
+                - f1-min-changes
+            attack_overrobustness (str): use lp-weak
+            attack_advrobustness (str): use strong attack!
+            models (List[str]): _description_
+            errorbars (bool, optional): _description_. Defaults to True.
+            label (str, optional): _description_. Defaults to None.
+            title (str, optional): _description_. Defaults to None.
+            K_l (List[float], optional): _description_. Defaults to [0.1, 0.5, 1, 1.5, 2, 5].
+        """
+        fig, ax = plt.subplots()
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        linestyle_list = ['-', '--', ':', '-.']
+        ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
+                          cycler('color', color_list))
+        # Calculate Over-Robustness Metric
+        Rover_dict = {}
+        for label, K, exp in self.experiment_iterator(attack_overrobustness, 
+                                                      models, K_l):
+            if label not in Rover_dict:
+                Rover_dict[label] = {}
+            if name == "f1-robustness":
+                Rover_dict[label][K] = np.minimum(exp.rob_g_wrt_y_l / exp.rob_f_wrt_y_l, 1)
+            elif name == "f1-min-changes":
+                Rover_dict[label][K] = np.minimum((exp.rob_g_wrt_y_l + 1) / (exp.rob_f_wrt_y_l + 1), 1)
+            else:
+                raise ValueError(f"name={name} but only f1-robustness or f1-min-changes supported.")
+        # Calculate Adv-Robsutness Metric
+        Radv_dict = {}
+        for label, K, exp in self.experiment_iterator(attack_advrobustness,
+                                                      models, K_l):
+            if label not in Radv_dict:
+                Radv_dict[label] = {}
+            if name == "f1-robustness":
+                Radv_dict[label][K] = exp.rob_f_wrt_g_l / exp.rob_g_wrt_y_l
+            elif name == "f1-min-changes":
+                Radv_dict[label][K] = (exp.rob_f_wrt_g_l + 1) / (exp.rob_g_wrt_y_l + 1)
+            else:
+                assert False
+        # Calculate F1-Score
+        for label in Rover_dict:
+            x = K_l
+            y = []
+            yerr = []
+            for K in K_l:
+                f1_score = 2 * Rover_dict[label][K] * Radv_dict[label][K] / (Rover_dict[label][K] + Radv_dict[label][K])
+                y.append(np.mean(f1_score))
+                yerr.append(np.std(f1_score))
+            if errorbars:
+                ax.errorbar(x, y, yerr=yerr, marker="o", label=label, capsize=3)
+            else:
+                ax.plot(x, y, marker="o", label=label)
+        if ylabel is None:
+            ylabel=name
+        ax.set_ylabel(ylabel)
+        if title is None:
+            title=name
+        ax.set_title(title)
+        ax.set_xticks(K_l, minor=False)
+        ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
+        ax.set_xlabel("K")
+        ax.set_xlim(left=0.)
+        ax.yaxis.grid()
+        ax.legend()
         plt.show()
 
     def model_iterator(
