@@ -37,6 +37,26 @@ def append_dict(source: Dict[str, Any], target: Dict[str, Any],
                 target[key].append(item)
 
 
+def extend_dict(source: Dict[str, Any], target: Dict[str, Any], 
+                include_keys: List[str] = []):
+    """Extends element in target dictionary by each elements in source-dict.
+    
+    Assumes source-dict has as element as list or again a dict. Only keys in
+    include_keys are considered. If a sub-dictionary is included, all its keys
+    will be included.
+    """
+    for key, item in source.items():
+        if key in include_keys:
+            if isinstance(item, dict):
+                if key not in target:
+                    target[key] = {}
+                extend_dict(item, target[key], include_keys = item.keys())
+            else: 
+                if key not in target:
+                    target[key] = []
+                target[key].extend(item)
+
+
 def average_dict(target: Dict[str, Any]):
     """Recursively averages every value-holding element in target-dictionary. 
     
@@ -123,6 +143,9 @@ class Experiment:
                             "c_gnn_robust_when_both", "c_degree_total"]
             append_dict(result["robustness_statistics"], 
                         self.robustness_statistics, exclude_keys)
+            exclude_keys = exclude_keys[:-1]
+            extend_dict(result["robustness_statistics"],
+                        self.robustness_statistics, include_keys=exclude_keys)
             final_training_loss_l.append(result["final_training_loss"])
             final_training_accuracy_l.append(result["final_training_accuracy"])
             final_validation_loss_l.append(result["final_validation_loss"])
@@ -134,13 +157,11 @@ class Experiment:
         self.avg_training_accuracy = np.mean(final_training_accuracy_l)
         self.std_training_accuracy = np.std(final_training_accuracy_l)
         self.avg_validation_loss = np.mean(final_validation_loss_l)
-        if self.label=="APPNP" and False:
-            print(f"K: {self.K}")
-            print(final_validation_accuracy_l)
-            print(final_validation_loss_l)
+        self.validation_loss = final_validation_loss_l
         self.std_validation_loss = np.std(final_validation_loss_l)
         self.avg_validation_accuracy = np.mean(final_validation_accuracy_l)
         self.std_validation_accuracy = np.std(final_validation_accuracy_l)
+        self.validation_accuracy = final_validation_accuracy_l
         if False:
             print(f"{self.label} on K={self.K} has {self.avg_training_accuracy*100:.1f}"
                 f"+-{self.std_training_accuracy*100:.1f}% trn acc and "
@@ -179,11 +200,17 @@ class Experiment:
         rob_g_wrt_y_l = []
         rob_f_wrt_g_l = []
         over_robustness_l = []
+        over_robustness_v2_l = []
         min_changes_to_flip_overrob_l = []
+        min_changes_to_flip_overrob_v2_l = []
         min_changes_to_flip_advrob_l = []
+        min_changes_to_flip_underrob_l = []
         adv_robustness_l = []
+        under_robustness_l = []
         f1_robustness_l = []
+        f1_robustness_v2_l = []
         f1_min_changes_l = []
+        f1_min_changes_v2_l = []
         for experiment in self.individual_experiments:
             result = experiment["result"]
             robustness_stats = result["robustness_statistics"]
@@ -191,12 +218,14 @@ class Experiment:
             f_wrt_y = robustness_stats["c_gnn_robust_when_both"]
             f_wrt_g = robustness_stats["c_gnn_wrt_bayes_robust"]
             over_robustness = 0
-            adv_robustness = 0
+            #adv_robustness = 0
             rob_f_wrt_y = 0
             rob_g_wrt_y = 0
             rob_f_wrt_g = 0
-            min_changes_to_flip_overrob = 0
+            min_changes_to_flip_overrob = 0 
+            min_changes_to_flip_overrob_v2 = 0
             min_changes_to_flip_advrob = 0
+            min_changes_to_flip_underrob = 0
             c_nodes = 0
             for deg in g_wrt_y:
                 if deg == "0":
@@ -207,25 +236,39 @@ class Experiment:
                     rob_g_wrt_y += g_wrt_y_i / int(deg)
                     rob_f_wrt_g += f_wrt_g_i / int(deg)
                     over_robustness += (f_wrt_y_i - g_wrt_y_i) / int(deg)
-                    adv_robustness += (g_wrt_y_i - f_wrt_g_i) / int(deg)
+                    #adv_robustness += (g_wrt_y_i - f_wrt_g_i) / int(deg)
                     min_changes_to_flip_overrob += (f_wrt_y_i + 1) / (g_wrt_y_i + 1)
+                    min_changes_to_flip_overrob_v2 += 1 - (f_wrt_g_i + 1) / (f_wrt_y_i + 1)
                     min_changes_to_flip_advrob += (f_wrt_g_i + 1) / (g_wrt_y_i + 1)
+                    min_changes_to_flip_underrob += 1 - min_changes_to_flip_advrob
                 c_nodes += len(g_wrt_y[deg])
             over_robustness_l.append(over_robustness / c_nodes)
-            adv_robustness_l.append(adv_robustness / c_nodes)
+            over_robustness_v2_l.append(1 - rob_f_wrt_g / rob_f_wrt_y)
+            adv_robustness_l.append(rob_f_wrt_g / rob_g_wrt_y)
+            under_robustness_l.append(1 - rob_f_wrt_g / rob_g_wrt_y)
             rob_f_wrt_y_l.append(rob_f_wrt_y / c_nodes)
             rob_g_wrt_y_l.append(rob_g_wrt_y / c_nodes)
             rob_f_wrt_g_l.append(rob_f_wrt_g / c_nodes)
             min_changes_to_flip_overrob_l.append(min_changes_to_flip_overrob / c_nodes) 
+            min_changes_to_flip_overrob_v2_l.append(min_changes_to_flip_overrob_v2 / c_nodes)
             min_changes_to_flip_advrob_l.append(min_changes_to_flip_advrob / c_nodes) 
+            min_changes_to_flip_underrob_l.append(min_changes_to_flip_underrob / c_nodes)
             # f1 robustness
             Rover = min(rob_g_wrt_y_l[-1] / rob_f_wrt_y_l[-1], 1)
             Radv = rob_f_wrt_g_l[-1] / rob_g_wrt_y_l[-1]
             f1_robustness_l.append(2 * Rover * Radv / (Rover + Radv))
+            # f1 robustness v2
+            Rover = 1 - over_robustness_v2_l[-1]
+            Radv = adv_robustness_l[-1]
+            f1_robustness_v2_l.append(2 * Rover * Radv / (Rover + Radv))
             # f1 min changes
             Rover = min((rob_g_wrt_y_l[-1] + 1)/(rob_f_wrt_y_l[-1] + 1), 1)
             Radv = min_changes_to_flip_advrob_l[-1]
             f1_min_changes_l.append(2 * Rover * Radv / (Rover + Radv))
+            # f1 min changes v2
+            Rover = min_changes_to_flip_overrob_v2_l[-1]
+            Radv = 1 - min_changes_to_flip_underrob_l[-1]
+            f1_min_changes_v2_l.append(2 * Rover * Radv / (Rover + Radv))
         if self.label == "APPNP" and False:
             print(over_robustness_l)
         # All Robustness Statistics Attributes
@@ -237,6 +280,8 @@ class Experiment:
         self.std_robustness_f_wrt_g = np.std(rob_f_wrt_g_l)
         self.avg_over_robustness = np.mean(over_robustness_l)
         self.std_over_robustness = np.std(over_robustness_l)
+        self.avg_over_robustness_v2 = np.mean(over_robustness_v2_l)
+        self.std_over_robustness_v2 = np.std(over_robustness_v2_l)
         self.relative_over_robustness = self.avg_robustness_f_wrt_y / self.avg_robustness_g_wrt_y
         # see https://www.geol.lsu.edu/jlorenzo/geophysics/uncertainties/Uncertaintiespart2.html#muldiv
         self.std_relative_over_robustness = \
@@ -245,6 +290,8 @@ class Experiment:
                 * self.relative_over_robustness 
         self.avg_adv_robustness = np.mean(adv_robustness_l)
         self.std_adv_robustness = np.std(adv_robustness_l)
+        self.avg_under_robustness = np.mean(under_robustness_l)
+        self.std_under_robustness = np.std(under_robustness_l)
         self.relative_adv_robustness = self.avg_robustness_f_wrt_g / self.avg_robustness_g_wrt_y
         self.std_relative_adv_robustness = \
             (self.std_robustness_f_wrt_g / self.avg_robustness_f_wrt_g
@@ -252,21 +299,33 @@ class Experiment:
                 * self.relative_adv_robustness
         self.avg_min_changes_to_flip_overrob = np.mean(min_changes_to_flip_overrob_l)
         self.std_min_changes_to_flip_overrob = np.std(min_changes_to_flip_overrob_l)
+        self.avg_min_changes_to_flip_overrob_v2 = np.mean(min_changes_to_flip_overrob_v2_l)
+        self.std_min_changes_to_flip_overrob_v2 = np.std(min_changes_to_flip_overrob_v2_l)
         self.avg_min_changes_to_flip_advrob = np.mean(min_changes_to_flip_advrob_l)
         self.std_min_changes_to_flip_advrob = np.std(min_changes_to_flip_advrob_l)
+        self.avg_min_changes_to_flip_underrob = np.mean(min_changes_to_flip_underrob_l)
+        self.std_min_changes_to_flip_underrob = np.std(min_changes_to_flip_underrob_l)
         self.avg_f1_robustness = np.mean(f1_robustness_l)
         self.std_f1_robustness = np.std(f1_robustness_l)
         self.avg_f1_min_changes = np.mean(f1_min_changes_l)
         self.std_f1_min_changes = np.std(f1_min_changes_l)
+        self.avg_f1_robustness_v2 = np.mean(f1_robustness_v2_l)
+        self.std_f1_robustness_v2 = np.std(f1_robustness_v2_l)
+        self.avg_f1_min_changes_v2 = np.mean(f1_min_changes_v2_l)
+        self.std_f1_min_changes_v2 = np.std(f1_min_changes_v2_l)
         # Raw Robustness Metrics for each Seed:
         self.rob_f_wrt_y_l = np.array(rob_f_wrt_y_l)
         self.rob_g_wrt_y_l = np.array(rob_g_wrt_y_l)
         self.rob_f_wrt_g_l = np.array(rob_f_wrt_g_l)
+        self.min_changes_to_flip_overrob_v2_l = np.array(min_changes_to_flip_overrob_v2_l)
+        self.min_changes_to_flip_advrob_l = np.array(min_changes_to_flip_advrob_l)
       
     def get_measurement(self, name: str) -> Tuple[float, float]:
         """Return tuple: averaged measurement, std-measurement."""
         if name == "over-robustness":
             return self.avg_over_robustness.item(), self.std_over_robustness.item()
+        if name == "over-robustness-v2":
+            return self.avg_over_robustness_v2.item(), self.std_over_robustness_v2.item()
         if name == "relative-over-robustness":
             return self.relative_over_robustness.item(), self.std_relative_over_robustness.item()
         if name == "f_wrt_y":
@@ -279,6 +338,8 @@ class Experiment:
             return self.avg_adv_robustness.item(), self.std_adv_robustness.item()
         if name == "relative-adversarial-robustness":
             return self.relative_adv_robustness.item(), self.std_adv_robustness.item()
+        if name == "under-robustness":
+            return self.avg_under_robustness.item(), self.std_under_robustness.item()
         if name == "validation-accuracy":
             return self.avg_validation_accuracy.item(), self.std_validation_accuracy.item()
         if name == "test-accuracy":
@@ -292,13 +353,21 @@ class Experiment:
             bayes_test_acc_std = self.prediction_statistics["std_c_acc_bayes"] / n
             return bayes_test_acc, bayes_test_acc_std
         if name == "relative-changes-to-flip-overrobust":
-            return self.avg_min_changes_to_flip_overrob, self.std_min_changes_to_flip_overrob
+            return self.avg_min_changes_to_flip_overrob.item(), self.std_min_changes_to_flip_overrob.item()
+        if name == "min-changes-to-flip-overrobust-v2":
+            return self.avg_min_changes_to_flip_overrob_v2.item(), self.std_min_changes_to_flip_overrob_v2.item()
         if name == "relative-changes-to-flip-advrobust":
-            return self.avg_min_changes_to_flip_advrob, self.std_min_changes_to_flip_advrob
+            return self.avg_min_changes_to_flip_advrob.item(), self.std_min_changes_to_flip_advrob.item()
+        if name == "min-changes-to-flip-underrobust":
+            return self.avg_min_changes_to_flip_underrob.item(), self.std_min_changes_to_flip_underrob.item()
         if name == "f1-robustness":
-            return self.avg_f1_robustness, self.std_f1_robustness
+            return self.avg_f1_robustness.item(), self.std_f1_robustness.item()
+        if name == "f1-robustness-v2":
+            return self.avg_f1_robustness_v2.item(), self.std_f1_robustness_v2.item()
         if name == "f1-min-changes":
-            return self.avg_f1_min_changes, self.std_f1_min_changes
+            return self.avg_f1_min_changes.item(), self.std_f1_min_changes.item()
+        if name == "f1-min-changes-2":
+            return self.avg_f1_min_changes_v2.item(), self.std_f1_min_changes_v2.item()
 
 
 class ExperimentManager:
@@ -376,17 +445,17 @@ class ExperimentManager:
             row = [
                 f"{exp.avg_robustness_f_wrt_y:.2f}+-{exp.std_robustness_f_wrt_y:.2f}",
                 f"{exp.avg_robustness_g_wrt_y:.2f}+-{exp.std_robustness_g_wrt_y:.2f}",
-                f"{exp.avg_over_robustness:.2f}+-{exp.std_over_robustness:.2f}",
+                f"{exp.avg_over_robustness_v2:.2f}+-{exp.std_over_robustness_v2:.2f}",
                 #f"{exp.avg_robustness_f_wrt_y / exp.avg_robustness_g_wrt_y * 100:.2f}",
                 f"{exp.relative_over_robustness:.2f}+-{exp.std_relative_over_robustness:.2f}",
-                f"{exp.avg_min_changes_to_flip:.2f}+-{exp.std_min_changes_to_flip:.2f}",
-                f"{exp.avg_robustness_f_wrt_g:.2f}+-{exp.std_robustness_f_wrt_g:.2f}",
+                f"{exp.avg_min_changes_to_flip_overrob_v2:.2f}+-{exp.std_min_changes_to_flip_overrob_v2:.2f}",
                 f"{exp.avg_adv_robustness:.2f}+-{exp.std_adv_robustness:.2f}",
                 #f"{exp.avg_robustness_f_wrt_g / exp.avg_robustness_g_wrt_y * 100:.2f}"
-                f"{exp.relative_adv_robustness:.2f}+-{exp.std_relative_adv_robustness:.2f}"
+                f"{exp.relative_adv_robustness:.2f}+-{exp.std_relative_adv_robustness:.2f}",
+                f"{exp.avg_under_robustness:.2f}+-{exp.std_under_robustness:.2f}"
             ]
             exp_l.append((key, row))
-        columns = ["Rob_f|y", "Rob_g|y", "f|y-g|y", "f|y/g|y", "f|y+1/g|y+1", "Rob_f|g", "g|y-f|g", "f|g/g|y"]
+        columns = ["Rob_f|y", "Rob_g|y", "1-f|g/f|y", "f|y/g|y", "1-f|y+1/f|y+1", "Rob_f|g", "f|g/g|y", "1-f|g/g|y"]
         f = pd.DataFrame.from_dict(dict(exp_l)).T
         f.columns = columns
         return f
@@ -465,7 +534,8 @@ class ExperimentManager:
         ax.legend()
         plt.show()
 
-    def plot_wrt_degree(self, name: str, attack: str, models: List[str], K: List[float],
+    def plot_wrt_degree(self, name: str, attack: str, models: List[str], 
+                        K: List[float], max_degree: int=None,
                         errorbars: bool=True, ylabel: str=None, title: str=None):
         """Generate w.r.t. degree plots.
 
@@ -481,12 +551,13 @@ class ExperimentManager:
             ylabel (str, optional): _description_. Defaults to None.
             title (str, optional): _description_. Defaults to None.
         """
-        max_deg = 0
-        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
-            avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
-            max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
-            if max_deg_ > max_deg:
-                max_deg = max_deg_
+        if max_degree is None:
+            max_degree = 0
+            for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+                avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+                max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
+                if max_deg_ > max_degree:
+                    max_degree = max_deg_
         
         fig, axs = plt.subplots()
         color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
@@ -503,6 +574,7 @@ class ExperimentManager:
             std_f_wrt_g = exp.robustness_statistics["std_avg_gnn_wrt_bayes_robust"]
             
             x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            x = x[x <= max_degree]
             ordered_avg_f_wrt_y = [avg_f_wrt_y[str(i)] for i in x]
             ordered_std_f_wrt_y = [std_f_wrt_y[str(i)] for i in x]
             ordered_avg_g_wrt_y = [avg_g_wrt_y[str(i)] for i in x]
@@ -542,6 +614,136 @@ class ExperimentManager:
         plt.grid()
         plt.show()
 
+    def boxplot_wrt_degree(self, name: str, attack: str, models: List[str], 
+                           K: List[float], max_degree: int = None, 
+                           errorbars: bool=True, ylabel: str=None, 
+                           title: str=None):
+        """Generate w.r.t. degree boxplots.
+
+        Args:
+            name (str):
+                - f_wrt_y
+                - f_wrt_g
+                - both
+            attack (str): _description_
+            models (List[str]): _description_
+            K (List[float]): _description_
+            errorbars (bool, optional): _description_. Defaults to True.
+            ylabel (str, optional): _description_. Defaults to None.
+            title (str, optional): _description_. Defaults to None.
+        """
+        if max_degree is None:
+            max_degree = 0
+            for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+                avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+                max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
+                if max_deg_ > max_degree:
+                    max_degree = max_deg_
+        
+        fig, axs = plt.subplots()
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        linestyle_list = ['-', '--', ':', '-.']
+        axs.set_prop_cycle(cycler('linestyle', linestyle_list)*
+                           cycler('color', color_list))
+        bayes_added = True
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            f_wrt_y = exp.robustness_statistics["avg_gnn_robust_when_both"]
+            g_wrt_y = exp.robustness_statistics["avg_bayes_robust_when_both"]
+            f_wrt_g = exp.robustness_statistics["avg_gnn_wrt_bayes_robust"]
+            x = np.sort([int(i) for i in f_wrt_y.keys()])
+            x = x[x <= max_degree]
+            ordered_f_wrt_y = [f_wrt_y[str(i)] for i in x]
+            ordered_g_wrt_y = [g_wrt_y[str(i)] for i in x]
+            ordered_f_wrt_g = [f_wrt_g[str(i)] for i in x]
+            if errorbars:
+                if name == "f_wrt_y" or name == "both":
+                    axs.boxplot(ordered_f_wrt_y, showfliers=False)
+                    #axs.violinplot(ordered_f_wrt_y)
+                    pass
+                if not bayes_added:
+                    axs.boxplot(ordered_g_wrt_y, 
+                                whiskerprops={'color' : 'tab:blue'}, 
+                                patch_artist=True,
+                                showfliers=False)
+            else:
+                pass
+            bayes_added = True
+        if ylabel is None:
+            ylabel=name
+        axs.set_ylabel(ylabel)
+        axs.set_xlabel("Degree")
+        axs.set_xlim(left=0)
+        axs.set_xticks(range(1, len(x)+1), x)
+        if title is None:
+            title=name
+        axs.set_title(title)
+        plt.grid()
+        plt.show()
+
+    def boxplot_wrt_degree_raw(self, name: str, attack: str, models: List[str], K: List[float],
+                        errorbars: bool=True, ylabel: str=None, title: str=None):
+        """Generate w.r.t. degree boxplots.
+
+        Args:
+            name (str):
+                - f_wrt_y
+                - f_wrt_g
+                - both
+            attack (str): _description_
+            models (List[str]): _description_
+            K (List[float]): _description_
+            errorbars (bool, optional): _description_. Defaults to True.
+            ylabel (str, optional): _description_. Defaults to None.
+            title (str, optional): _description_. Defaults to None.
+        """
+        max_deg = 0
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+            max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
+            if max_deg_ > max_deg:
+                max_deg = max_deg_
+        
+        fig, axs = plt.subplots()
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        linestyle_list = ['-', '--', ':', '-.']
+        axs.set_prop_cycle(cycler('linestyle', linestyle_list)*
+                           cycler('color', color_list))
+        bayes_added = False
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            f_wrt_y = exp.robustness_statistics["c_gnn_robust_when_both"]
+            g_wrt_y = exp.robustness_statistics["c_bayes_robust_when_both"]
+            f_wrt_g = exp.robustness_statistics["c_gnn_wrt_bayes_robust"]
+            
+            x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            ordered_f_wrt_y = [f_wrt_y[str(i)] for i in x]
+            ordered_g_wrt_y = [g_wrt_y[str(i)] for i in x]
+            ordered_f_wrt_g = [f_wrt_g[str(i)] for i in x]
+            if errorbars:
+                if name == "f_wrt_y" or name == "both":
+                    #axs.boxplot(ordered_f_wrt_y, showfliers=False)
+                    #axs.violinplot(ordered_f_wrt_y)
+                    pass
+                if not bayes_added:
+                    print(len(ordered_g_wrt_y))
+                    axs.boxplot(ordered_g_wrt_y, 
+                                whiskerprops={'color' : 'tab:blue'}, 
+                                patch_artist=True,
+                                showfliers=False)
+            else:
+                pass
+            bayes_added = True
+        if ylabel is None:
+            ylabel=name
+        axs.set_ylabel(ylabel)
+        axs.set_xlabel("Degree")
+        axs.set_xlim(left=0)
+        axs.set_xticks(range(1, len(ordered_f_wrt_y)+1), x)
+        if title is None:
+            title=name
+        axs.set_title(title)
+        plt.grid()
+        plt.show()
+
     def plot_f1(self, name: str, attack_overrobustness: str, attack_advrobustness: str,
                 models: List[str], errorbars: bool=True, 
                 label: str=None, title: str=None, ylabel: str=None, 
@@ -575,6 +777,10 @@ class ExperimentManager:
                 Rover_dict[label][K] = np.minimum(exp.rob_g_wrt_y_l / exp.rob_f_wrt_y_l, 1)
             elif name == "f1-min-changes":
                 Rover_dict[label][K] = np.minimum((exp.rob_g_wrt_y_l + 1) / (exp.rob_f_wrt_y_l + 1), 1)
+            elif name == "f1-robustness-v2":
+                Rover_dict[label][K] = exp.rob_f_wrt_g_l / exp.rob_f_wrt_y_l
+            elif name == "f1-min-changes-v2":
+                Rover_dict[label][K] = 1 - exp.min_changes_to_flip_overrob_v2_l
             else:
                 raise ValueError(f"name={name} but only f1-robustness or f1-min-changes supported.")
         # Calculate Adv-Robsutness Metric
@@ -587,6 +793,10 @@ class ExperimentManager:
                 Radv_dict[label][K] = exp.rob_f_wrt_g_l / exp.rob_g_wrt_y_l
             elif name == "f1-min-changes":
                 Radv_dict[label][K] = (exp.rob_f_wrt_g_l + 1) / (exp.rob_g_wrt_y_l + 1)
+            elif name == "f1-robustness-v2":
+                Radv_dict[label][K] = exp.rob_f_wrt_g_l / exp.rob_g_wrt_y_l
+            elif name == "f1-min-changes-v2":
+                Radv_dict[label][K] = exp.avg_min_changes_to_flip_advrob
             else:
                 assert False
         # Calculate F1-Score
