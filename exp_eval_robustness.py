@@ -246,39 +246,39 @@ def run(data_params: Dict[str, Any],
                             n_features=X_np.shape[1], 
                             n_classes=data_params["classes"])
     
-    not_trained = True
-    while not_trained:
-        model = create_model(model_params_trn)
-        if model is not None:
-            model = model.to(device)
-        label_prop = None
-        if model_params["use_label_propagation"]:
-            if model_params["lp_use_clamping"]:
-                post_step = lambda y: y.clamp_(0, 1)
-            else:
-                post_step = lambda y: y
-            label_prop = LP(model_params["lp_layers"], 
-                            model_params["lp_alpha"], 
-                            data_params["classes"],
-                            post_step).to(device)
-        #logging.info(model)
+    #not_trained = True
+    #while not_trained:
+    model = create_model(model_params_trn)
+    if model is not None:
+        model = model.to(device)
+    label_prop = None
+    if model_params["use_label_propagation"]:
+        if model_params["lp_use_clamping"]:
+            post_step = lambda y: y.clamp_(0, 1)
+        else:
+            post_step = lambda y: y
+        label_prop = LP(model_params["lp_layers"], 
+                        model_params["lp_alpha"], 
+                        data_params["classes"],
+                        post_step).to(device)
+    #logging.info(model)
 
-        # Train Model
-        if train_params["inductive"]:
-            train = train_inductive
-        else:
-            train = train_transductive
-        if model is not None:
-            # Train model independently from label propagation.
-            lp_in_training = None
-        else:
-            lp_in_training = label_prop
-        train_tracker = train(model, lp_in_training, X, A, y, split_trn, split_val, 
-                            train_params, verbosity_params, _run)
-        if train_tracker.get_best_epoch() == 1 and lp_in_training is None:
-            logging.info("Model did not train, re-initialize model.")
-        else:
-            not_trained = False
+    # Train Model
+    if train_params["inductive"]:
+        train = train_inductive
+    else:
+        train = train_transductive
+    if model is not None:
+        # Train model independently from label propagation.
+        lp_in_training = None
+    else:
+        lp_in_training = label_prop
+    train_tracker = train(model, lp_in_training, X, A, y, split_trn, split_val, 
+                        train_params, verbosity_params, _run)
+    #if train_tracker.get_best_epoch() == 1 and lp_in_training is None:
+    #    logging.info("Model did not train, re-initialize model.")
+    #else:
+    #    not_trained = False
 
     logging.info("Testing Trained Model + Label Propagation if specified:")
     test_tracker = test(model, label_prop, X, A, y, split_trn, split_val, _run)

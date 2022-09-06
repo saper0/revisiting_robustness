@@ -1,5 +1,5 @@
 seml:
-  name: gat
+  name: test
   executable: exp_train.py
   project_root_dir: ../../
   output_dir: log/
@@ -26,21 +26,16 @@ fixed:
   train_params:
     inductive: True
 
+  other_params:
+    sacred_metrics: False
+
 grid:
   
   seed:
-    type: choice
-    options:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
-      - 7
-      - 8
-      - 42
+    type: range
+    min: 0
+    max: 2
+    step: 1
 
 K01:
   fixed:

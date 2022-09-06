@@ -375,38 +375,40 @@ class ExperimentManager:
     
     Assumes same experiments with different seeds are stored consecutively.
     """
-    def __init__(self, experiments: List[Dict[str, Any]], collection="runs", 
-                 uri=URI):
+    def __init__(self, experiments: List[Dict[str, Any]], uri=URI):
         """Establish connection to a given mongodb collection. 
         
         Load and administrate data from specified experiments.
         """
         self.client = MongoClient(uri)
         self.db = self.client.gosl
-        self.collection = self.db[collection]
         self.load(experiments)
 
-    def load_experiment_dict(self, id: int) -> Dict[str, Any]:
+    def load_experiment_dict(self, id: int, collection: str) -> Dict[str, Any]:
         """Return result-dict of experiment with ID id."""
-        return self.collection.find_one({'_id': id})
+        return self.db[collection].find_one({'_id': id})
 
-    def load_experiment(self, start_id: int, n_seeds: int) -> Experiment:
+    def load_experiment(self, start_id: int, n_seeds: int, 
+                        collection: str) -> Experiment:
         """Return experiment with ID id."""
         exp_dict_l = []
         for i in range(n_seeds):
-            exp_dict_l.append(self.load_experiment_dict(start_id + i))
+            exp_dict_l.append(self.load_experiment_dict(start_id + i, 
+                                                        collection))
         return Experiment(exp_dict_l)
 
     def load_experiments(
-            self, start_id: int, end_id: int, n_seeds: int, label: str=None
+            self, start_id: int, end_id: int, n_seeds: int, label: str=None,
+            collection: str="runs",
         ) -> List[Experiment]:
         """Return Experiments between start_id and end_id with given label.
         
         Assumes that one experiment consists of multiple seeds which are stored
-        consecutively in the mongodb. 
+        consecutively in the mongodb in a given collection.
         """
         experiment_ids = [i for i in range(start_id, end_id + 1, n_seeds)]
-        experiments = [self.load_experiment(i, n_seeds) for i in experiment_ids]
+        experiments = [self.load_experiment(i, n_seeds, collection) 
+                       for i in experiment_ids]
         if label is not None:
             filtered_experiments = []
             for experiment in experiments:
@@ -424,10 +426,13 @@ class ExperimentManager:
         """
         self.experiments_dict = {}
         for exp_spec in experiments:
+            if "collection" not in exp_spec:
+                exp_spec["collection"] = "runs"
             exp_list = self.load_experiments(exp_spec["start_id"],
                                              exp_spec["end_id"],
                                              exp_spec["n_seeds"],
-                                             exp_spec["label"])
+                                             exp_spec["label"],
+                                             exp_spec["collection"])
             for exp in exp_list:
                 if exp.attack not in self.experiments_dict:
                     self.experiments_dict[exp.attack] = {}

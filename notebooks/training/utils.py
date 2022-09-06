@@ -189,22 +189,24 @@ class ExperimentLoader:
         """Return result-dict of experiment with ID id."""
         return self.collection.find_one({'_id': id})
 
-    def load_experiment(self, start_id: int, n_seeds: int) -> Experiment:
+    def load_experiment(self, start_id: int, n_seeds: int, use_seeds) -> Experiment:
         """Return experiment with ID id."""
         exp_dict_l = []
         for i in range(n_seeds):
+            if use_seeds is not None and i >= use_seeds:
+                continue
             exp_dict_l.append(self.load_experiment_dict(start_id + i))
         return Experiment(exp_dict_l)
 
     def load_experiments(self, start_id: int, end_id: int, n_seeds: int, 
-                         K: float) -> List[Experiment]:
+                         K: float, use_seeds) -> List[Experiment]:
         """Return Experiments between start_id and end_id with K=K.
         
         Assumes that one experiment consists of multiple seeds which are stored
         consecutively in the mongodb. 
         """
         experiment_ids = [i for i in range(start_id, end_id + 1, n_seeds)]
-        experiments = [self.load_experiment(i, n_seeds) for i in experiment_ids]
+        experiments = [self.load_experiment(i, n_seeds, use_seeds) for i in experiment_ids]
         experiments_with_K = []
         for experiment in experiments:
             if experiment.K == K:
@@ -215,7 +217,7 @@ class ExperimentLoader:
 
 def get_best_hyperparams(
     start_id: int, end_id: int, n_seeds: int, hyperparams: List[str], 
-    K: Union[List[int], int]
+    K: Union[List[int], int], collection: str="runs", use_seeds: int=None,
 ) -> pd.DataFrame:
     """Return experiments ordered by performance for a particular K or if K is
     a list, return a list of the best experiments for each K.
@@ -227,19 +229,21 @@ def get_best_hyperparams(
             setting.
         hyperparams (List[str]): Hyperparameters to dislay in dataframe.
         K (Union[List[int], int]): Which K to look at.
-
+        collections (str): Default: "runs". MongoDB-collection of Experiments
+        use_seeds: If given, of the first use_seeds of n_seeds will be used.
     Returns:
         pd.DataFrame: _description_
     """
-    exp_loader = ExperimentLoader()
+    exp_loader = ExperimentLoader(collection=collection)
     if not isinstance(K, list):
-        experiments = exp_loader.load_experiments(start_id, end_id, n_seeds, K)
+        experiments = exp_loader.load_experiments(start_id, end_id, n_seeds, K,
+                                                  use_seeds)
         return Experiment.to_dataframe(experiments, hyperparams)
     else:
         experiments = []
         for k in K:
             experiment = exp_loader.load_experiments(start_id, end_id, 
-                                                     n_seeds, k)[0]
+                                                     n_seeds, k, use_seeds)[0]
             experiments.append(experiment)
         df = Experiment.to_dataframe(experiments, hyperparams)
         df["id"] = df.index

@@ -22,6 +22,9 @@ fixed:
     n_heads: 8
     n_features_per_head: 8
 
+  other_params:
+    sacred_metrics: False
+
 grid:
   data_params:
     K:
@@ -65,8 +68,7 @@ grid:
         - 0.0001
 
   seed:
-    type: choice
-    options:
-      - 0
-      - 1
-      - 2
+    type: range
+    min: 0
+    max: 30
+    step: 1

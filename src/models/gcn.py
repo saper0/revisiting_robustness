@@ -1,4 +1,5 @@
 import collections
+from multiprocessing.sharedctypes import Value
 from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
@@ -70,7 +71,7 @@ class DenseGCN(nn.Module):
                  n_features: int,
                  n_classes: int,
                  n_filters: int = 64,
-                 activation: nn.Module = nn.ReLU(),
+                 activation: str ="ReLU",
                  dropout: float = 0.5,
                  ** kwargs):
         """
@@ -82,9 +83,9 @@ class DenseGCN(nn.Module):
             Number of classes for prediction
         n_filters : int, optional
             number of dimensions for the hidden units, by default 80
-        activation : nn.Module, optional
-            Arbitrary activation function for the hidden layer, by default 
-            nn.ReLU()
+        activation : str, optional
+            Either ReLU or Identity (=> LinearGCN/SGC), by default 
+            ReLU.
         dropout : int, optional
             Dropout rate, by default 0.5
         """
@@ -92,7 +93,13 @@ class DenseGCN(nn.Module):
         self.n_features = n_features
         self.n_filters = n_filters
         self.n_classes = n_classes
-        self.activation = activation
+        if activation == "ReLU":
+            self.activation = nn.ReLU()
+        elif activation == "Identity":
+            self.activation = nn.Identity()
+        else:
+            raise ValueError("Only ReLU and Identity supportes as activation "
+                            "functions.")
         self.dropout = dropout
         self.layers = nn.ModuleList([
             nn.Sequential(collections.OrderedDict([

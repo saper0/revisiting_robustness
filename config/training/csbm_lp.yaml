@@ -23,6 +23,9 @@ fixed:
     lp_layers: 50
     lp_use_clamping: False
 
+  other_params:
+    sacred_metrics: False
+
 grid:
   data_params:
     K:
@@ -62,9 +65,8 @@ grid:
         - 1.00
         
   seed:
-    type: choice
-    options:
-      - 0
-      - 1
-      - 2
+    type: range
+    min: 0
+    max: 30
+    step: 1
         

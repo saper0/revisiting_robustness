@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Union
 import numpy as np
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 from src.attacks import create_attack
 from src.graph_models import GRAPH_MODEL_TYPE
@@ -102,7 +103,7 @@ def evaluate_robustness(model: Optional[nn.Module],
     n = y_np.size
     if model is not None:
         model.eval()
-    for i in range(inductive_samples):
+    for i in tqdm(range(inductive_samples)):
         # ToDo: Create empty X, A, y templates & always only fill last row
         X, A, y = graph_model.sample_conditional(1, X_np, A_np, y_np)
         deg_n = str(np.sum(A[:,n]))
@@ -155,17 +156,28 @@ def evaluate_robustness(model: Optional[nn.Module],
         gnn_wrt_bayes_setting = False
         if bayes_separable and gnn_separable:
             gnn_wrt_bayes_setting = True
-        attack = create_attack(n, X, A, y, attack_params)
+
+        attack = create_attack(n, X, A, y, attack_params, model, label_prop, 
+                            device)
+        #print(f"Deg: {deg_n}; true_class: {y[n]}")
         while bayes_separable or gnn_separable:
+            #print(f"Bayes_sep: {bayes_separable}; GNN_sep: {gnn_separable}")
             adv_edge = attack.create_adversarial_pert()
             if adv_edge is not None:
                 u, v = adv_edge
+                d = np.linalg.norm(X[u, :] - X[v, :])
                 if A_gpu[u, v] == 1:
+                    #print(f"Edge Removed: ({u}, {v}); Classes: ({y[u]}, {y[v]}), Feature Distance: {d:.3f}")
                     A_gpu[u, v] = 0
                     A_gpu[v, u] = 0
+                    A[u, v] = 0 #simple attacks update A, nettack not
+                    A[v, u] = 0
                 else:
+                    #print(f"Edge Added: ({u}, {v}); Classes: ({y[u]}, {y[v]}), Feature Distance: {d:.3f}")
                     A_gpu[u, v] = 1
                     A_gpu[v, u] = 1
+                    A[u, v] = 1
+                    A[v, u] = 1
             else:
                 assert not bayes_separable
                 assert gnn_separable

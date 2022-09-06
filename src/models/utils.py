@@ -14,7 +14,7 @@ def process_input(data: Union[Data, TensorType["n_nodes", "n_features"]],
                                  TensorType["nnz"]]:
     """Process (divers) input to be forwarded through model into standard form.
     
-    Standard form is defines as pytorch_geometric modules expect input.
+    Standard form is defined as pytorch_geometric modules expect input.
 
     Returns:
         x ... feature matrix (|V|, |F|)

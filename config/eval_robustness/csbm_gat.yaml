@@ -31,8 +31,8 @@ grid:
     attack: 
       type: choice
       options:
-      #- "l2"
-      #- "random"
+      - "l2"
+      - "random"
       - "l2-weak"
   
   seed:
@@ -47,7 +47,7 @@ grid:
       - 6
       - 7
       - 8
-      - 42
+      - 9
 
 K01:
   fixed:
@@ -56,7 +56,7 @@ K01:
 
     model_params:
       dropout: 0.0
-      dropout_neighbourhood: 0.0
+      dropout_neighbourhood: 0.6
 
     train_params:
       lr: 0.10
@@ -69,11 +69,11 @@ K05:
 
     model_params:
       dropout: 0.0
-      dropout_neighbourhood: 0.6
+      dropout_neighbourhood: 0.3
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0010
+      lr: 0.010
+      weight_decay: 0.0001
 
 K1:
   fixed:
@@ -95,10 +95,10 @@ K15:
 
     model_params:
       dropout: 0.0
-      dropout_neighbourhood: 0.3
+      dropout_neighbourhood: 0.6
 
     train_params:
-      lr: 0.01
+      lr: 0.10
       weight_decay: 0.0001
 
 K2:
@@ -108,7 +108,7 @@ K2:
 
     model_params:
       dropout: 0.0
-      dropout_neighbourhood: 0.3
+      dropout_neighbourhood: 0.6
 
     train_params:
       lr: 0.10
@@ -125,4 +125,4 @@ K5:
 
     train_params:
       lr: 0.10
-      weight_decay: 0.0001
+      weight_decay: 0.0010

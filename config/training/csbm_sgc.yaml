@@ -1,5 +1,5 @@
 seml:
-  name: trn_appnp
+  name: trn_sgc
   executable: exp_train.py
   project_root_dir: ../../
   output_dir: log/training
@@ -13,14 +13,13 @@ slurm:
     time: 0-00:30     # max time, D-HH:MM
 
 fixed:
+  model_params:
+    label: SGC
+    model: DenseGCN
+    activation: Identity
+
   train_params:
     inductive: True
-
-  model_params:
-    label: APPNP
-    model: APPNP
-    n_hidden: 64
-    K: 10
 
   other_params:
     sacred_metrics: False
@@ -45,13 +44,6 @@ grid:
         - 0.3
         - 0.5
 
-    alpha: 
-      type: choice
-      options:
-        - 0.05
-        - 0.1
-        - 0.2
-
   train_params:
     lr: 
       type: choice
@@ -59,6 +51,7 @@ grid:
         - 0.1
         - 0.01
         - 0.001
+        - 0.0001
 
     weight_decay:
       type: choice
@@ -70,6 +63,6 @@ grid:
   seed:
     type: range
     min: 0
-    max: 30
+    max: 10
     step: 1
         

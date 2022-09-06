@@ -1,3 +1,4 @@
+from importlib.util import module_for_loader
 from typing import Tuple
 
 import numpy as np
@@ -12,9 +13,9 @@ class SimpleAttack(LocalAttack):
     def __init__(self, n_idx: int, X: np.ndarray, A: np.ndarray, 
                        y: np.ndarray, attack="random") -> None:
         self.target = n_idx
-        self.X = X
-        self.A = A
-        self.y = y
+        self.X = np.copy(X)
+        self.A = np.copy(A)
+        self.y = np.copy(y)
         self.pot_neighbours = self.prepare_attack(attack)
 
     def prepare_attack(self, attack) -> np.ndarray:

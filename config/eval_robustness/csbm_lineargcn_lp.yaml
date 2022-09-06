@@ -1,8 +1,8 @@
 seml:
-  name: eval_robustness_gat_lp
+  name: eval_robustness_lineargcn_lp
   executable: exp_eval_robustness.py
   project_root_dir: ../../
-  output_dir: log/eval_robustness
+  output_dir: log/eval_robustness/
 
 slurm:
   experiments_per_job: 1
@@ -13,12 +13,10 @@ slurm:
     time: 0-00:30     # max time, D-HH:MM
 
 fixed:
-
   model_params:
-    label: GAT+LP
-    model: GAT
-    n_heads: 8
-    n_features_per_head: 8
+    label: LinearGCN+LP
+    model: LinearGCN
+    n_filters: 64
     use_label_propagation: True
     lp_layers: 50
     lp_alpha: 0.7
@@ -30,6 +28,9 @@ fixed:
   train_params:
     inductive: True
 
+  other_params:
+    sacred_metrics: False
+
 grid:
   attack_params:
     attack: 
@@ -40,18 +41,10 @@ grid:
       - "l2-weak"
   
   seed:
-    type: choice
-    options:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
-      - 7
-      - 8
-      - 9
+    type: range
+    min: 0
+    max: 10
+    step: 1
 
 K01:
   fixed:
@@ -59,11 +52,10 @@ K01:
       K: 0.1
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.6
+      dropout: 0.5
 
     train_params:
-      lr: 0.10
+      lr: 0.1
       weight_decay: 0.0001
 
 K05:
@@ -72,11 +64,10 @@ K05:
       K: 0.5
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.3
+      dropout: 0.5
 
     train_params:
-      lr: 0.010
+      lr: 0.1
       weight_decay: 0.0001
 
 K1:
@@ -85,12 +76,11 @@ K1:
       K: 1.0
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.3
+      dropout: 0.5
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0010
+      lr: 0.1
+      weight_decay: 0.0001
 
 K15:
   fixed:
@@ -98,11 +88,10 @@ K15:
       K: 1.5
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.6
+      dropout: 0.5
 
     train_params:
-      lr: 0.10
+      lr: 0.1
       weight_decay: 0.0001
 
 K2:
@@ -111,12 +100,11 @@ K2:
       K: 2.0
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.6
+      dropout: 0.5
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0010
+      lr: 0.1
+      weight_decay: 0.0001
 
 K5:
   fixed:
@@ -125,8 +113,7 @@ K5:
 
     model_params:
       dropout: 0.0
-      dropout_neighbourhood: 0.0
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0010
+      lr: 0.1
+      weight_decay: 0.0100

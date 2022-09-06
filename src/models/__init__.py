@@ -26,6 +26,8 @@ def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
         return APPNP(**hyperparams)
     if hyperparams['model'] == "DenseGCN":
         return DenseGCN(**hyperparams)
+    if hyperparams['model'] == "LinearGCN":
+        return DenseGCN(activation="Identity", **hyperparams)
     if hyperparams['model'] == "GAT":
         return GAT(**hyperparams)
     if hyperparams['model'] == "GCN":
@@ -41,6 +43,7 @@ __all__ = [GCN,
            APPNP,
            GAT,
            DenseGCN,
+           SGC,
            LP,
            create_model,
            MODEL_TYPE]

@@ -35,23 +35,15 @@ grid:
     attack: 
       type: choice
       options:
-      #- "l2"
-      #- "random"
+      - "l2"
+      - "random"
       - "l2-weak"
   
   seed:
-    type: choice
-    options:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
-      - 7
-      - 8
-      - 42
+    type: range
+    min: 0
+    max: 10
+    step: 1
 
 K01:
   fixed:
@@ -129,4 +121,4 @@ K5:
 
     train_params:
       lr: 0.10
-      weight_decay: 0.010
+      weight_decay: 0.100
