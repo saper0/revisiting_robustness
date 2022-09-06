@@ -12,7 +12,9 @@ from src.models.lp import LP
 ATTACK_TYPE = [SimpleAttack, Nettack, NettackAdapted]
 
 def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
-                  hyperparams: Dict[str, Any], model: Optional[nn.Module]=None, 
+                  hyperparams: Dict[str, Any], 
+                  surrogate_model: Optional[nn.Module]=None,
+                  model: Optional[nn.Module]=None, 
                   label_prop: Optional[LP]=None,
                   device: Union[torch.device, str]=None) -> ATTACK_TYPE:
     """Initialize a local attack on a target node.
@@ -24,7 +26,11 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
         y (np.ndarray): Node labels.
         hyperparams (Dict[str, Any]): Parameters of local attack. Must include
             key "attack" specifying the name of the attack to create.
-
+        surrogate_model: (Optional[nn.Module]): Only relevant if nettack is 
+            used. Surrogate model to attack to get perturbed adjacency matrix.
+        model (Optional[nn.Module]): Only used for nettack-adapted.
+        label_prop (Optional[LP]): Only used for nettack-adapted.
+        device (Union[torch.device, str]): Only used for nettack-adapted.
     Raises:
         ValueError: If specified attack not found.
 
@@ -35,7 +41,7 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
         or hyperparams["attack"] == "l2-weak":
         return SimpleAttack(target_idx, X, A, y, **hyperparams)
     if hyperparams["attack"] == "nettack":
-        return Nettack(target_idx, X, A, y, model)
+        return Nettack(target_idx, X, A, y, surrogate_model)
     if hyperparams["attack"] == "nettack-adapted":
         return NettackAdapted(hyperparams["attack"], target_idx, X, A, y, 
                               model, label_prop, device)

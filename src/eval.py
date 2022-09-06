@@ -19,6 +19,7 @@ def evaluate_robustness(model: Optional[nn.Module],
                         y_np: np.ndarray,
                         inductive_samples: int,
                         attack_params: Dict[str, Any],
+                        surrogate_model: Optional[nn.Module], 
                         device: Union[torch.device, str]) -> Dict[str, Any]:
     """Evaluate the robustness of a given model on a synthetic graph.
 
@@ -43,6 +44,9 @@ def evaluate_robustness(model: Optional[nn.Module],
         y_np (np.ndarray, [n, ]): Labels of nodes (assumed to be known)
         inductive_samples (int): How often an additional node should be 
             inductively sampled.
+        attack_params (Dict[str, Any]): Used to create attack.
+        surrogate_model: (Optional[nn.Module]): If nettack is used, surrogate
+            model to attack to get perturbed adjacency matrix.
         device: Calculation device for predictions.
 
     Returns:
@@ -156,16 +160,15 @@ def evaluate_robustness(model: Optional[nn.Module],
         gnn_wrt_bayes_setting = False
         if bayes_separable and gnn_separable:
             gnn_wrt_bayes_setting = True
-
-        attack = create_attack(n, X, A, y, attack_params, model, label_prop, 
-                            device)
+        attack = create_attack(n, X, A, y, attack_params, surrogate_model, 
+                               model, label_prop, device)
         #print(f"Deg: {deg_n}; true_class: {y[n]}")
         while bayes_separable or gnn_separable:
             #print(f"Bayes_sep: {bayes_separable}; GNN_sep: {gnn_separable}")
             adv_edge = attack.create_adversarial_pert()
             if adv_edge is not None:
                 u, v = adv_edge
-                d = np.linalg.norm(X[u, :] - X[v, :])
+                #d = np.linalg.norm(X[u, :] - X[v, :])
                 if A_gpu[u, v] == 1:
                     #print(f"Edge Removed: ({u}, {v}); Classes: ({y[u]}, {y[v]}), Feature Distance: {d:.3f}")
                     A_gpu[u, v] = 0

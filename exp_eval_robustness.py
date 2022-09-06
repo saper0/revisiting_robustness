@@ -284,12 +284,24 @@ def run(data_params: Dict[str, Any],
     test_tracker = test(model, label_prop, X, A, y, split_trn, split_val, _run)
 
     # Robustness Evaluation
+    surrogate_model = None
+    if attack_params["attack"] == "nettack":
+        # Train surrogate model
+        surrogate_model_params = dict(**attack_params["surrogate_model_params"],
+                                      n_features=X_np.shape[1], 
+                                      n_classes=data_params["classes"])
+        surrogate_train_params = attack_params["surrogate_train_params"]
+        surrogate_model = create_model(surrogate_model_params).to(device)
+        train(surrogate_model, None, X, A, y, split_trn, split_val, 
+              surrogate_train_params, verbosity_params, _run)
+        surrogate_model.eval()
     results_dict = evaluate_robustness(model, 
                                        label_prop,
                                        graph_model, 
                                        X_np, A_np, y_np,
                                        data_params["inductive_samples"], 
                                        attack_params,
+                                       surrogate_model,
                                        device)
 
     # (Optional) Logging of Robusntess Statistics
