@@ -164,8 +164,11 @@ def evaluate_robustness(model: Optional[nn.Module],
                                model, label_prop, device)
         #print(f"Deg: {deg_n}; true_class: {y[n]}")
         while bayes_separable or gnn_separable:
-            #print(f"Bayes_sep: {bayes_separable}; GNN_sep: {gnn_separable}")
+            #print(f"{c_robustness}: Bayes_sep: {bayes_separable}; GNN_sep: {gnn_separable}")
             adv_edge = attack.create_adversarial_pert()
+            if c_robustness >= y_np.size - 1:
+                # Nettack had possibility to remove all same-class and add all different-class edges
+                adv_edge = None
             if adv_edge is not None:
                 u, v = adv_edge
                 #d = np.linalg.norm(X[u, :] - X[v, :])
@@ -181,15 +184,13 @@ def evaluate_robustness(model: Optional[nn.Module],
                     A_gpu[v, u] = 1
                     A[u, v] = 1
                     A[v, u] = 1
-            else:
-                assert not bayes_separable
-                assert gnn_separable
+                    
             # Robustness of BC
             if bayes_separable:
                 bayes_separable_new, _ = graph_model.likelihood_separability(
                     X, A, y, [n]
                 )
-                if not bayes_separable_new:
+                if not bayes_separable_new or adv_edge is None:
                     if deg_n not in c_bayes_robust:
                         c_bayes_robust[deg_n] = []
                     c_bayes_robust[deg_n].append(c_robustness)
@@ -232,7 +233,7 @@ def evaluate_robustness(model: Optional[nn.Module],
                     c_gnn_higher_robust += 1
                     c_gnn_wrt_bayes_robust[deg_n].append(c_robustness)
 
-            bayes_separable = bayes_separable_new
+            bayes_separable = bayes_separable_new if adv_edge is not None else False
             gnn_separable = gnn_separable_new if adv_edge is not None else False
             c_robustness += 1
 

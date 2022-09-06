@@ -39,7 +39,7 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
     """
     if hyperparams["attack"] == "random" or hyperparams["attack"] == "l2" \
         or hyperparams["attack"] == "l2-weak":
-        return SimpleAttack(target_idx, X, A, y, **hyperparams)
+        return SimpleAttack(target_idx, X, A, y, hyperparams["attack"])
     if hyperparams["attack"] == "nettack":
         return Nettack(target_idx, X, A, y, surrogate_model)
     if hyperparams["attack"] == "nettack-adapted":
