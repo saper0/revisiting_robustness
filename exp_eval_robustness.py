@@ -280,8 +280,11 @@ def run(data_params: Dict[str, Any],
     #else:
     #    not_trained = False
 
-    logging.info("Testing Trained Model + Label Propagation if specified:")
-    test_tracker = test(model, label_prop, X, A, y, split_trn, split_val, _run)
+    if label_prop is not None:
+        logging.info("Testing Trained Model + Label Propagation:")
+        test_tracker = test(model, label_prop, X, A, y, split_trn, split_val, _run)
+    else:
+        test_tracker = train_tracker
 
     # Robustness Evaluation
     surrogate_model = None
@@ -321,7 +324,8 @@ def run(data_params: Dict[str, Any],
     log_wrt_bayes_dicts(robustness_statistics["avg_gnn_wrt_bayes_robust"], 
                         robustness_statistics["avg_bayes_robust_when_both"], 
                         robustness_statistics["avg_gnn_robust_when_both"])
-     
+    
+    used_epoch = test_tracker.get_best_epoch() - 1
     return dict(
         prediction_statistics = results_dict["prediction_statistics"],
         robustness_statistics = results_dict["robustness_statistics"],
@@ -329,9 +333,9 @@ def run(data_params: Dict[str, Any],
         validation_loss = train_tracker.get_validation_loss(),
         training_accuracy = train_tracker.get_training_accuracy(),
         validation_accuracy = train_tracker.get_validation_accuracy(),
-        final_training_loss = test_tracker.get_training_loss()[0],
-        final_training_accuracy = test_tracker.get_training_accuracy()[0],
-        final_validation_loss = test_tracker.get_validation_loss()[0],
-        final_validation_accuracy = test_tracker.get_validation_accuracy()[0]
+        final_training_loss = test_tracker.get_training_loss()[used_epoch],
+        final_training_accuracy = test_tracker.get_training_accuracy()[used_epoch],
+        final_validation_loss = test_tracker.get_validation_loss()[used_epoch],
+        final_validation_accuracy = test_tracker.get_validation_accuracy()[used_epoch]
     )
 
