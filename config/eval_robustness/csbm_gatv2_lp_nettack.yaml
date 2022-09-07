@@ -1,5 +1,5 @@
 seml:
-  name: eval_robustness_gcn
+  name: eval_robustness_gat_lp
   executable: exp_eval_robustness.py
   project_root_dir: ../../
   output_dir: log/eval_robustness
@@ -10,15 +10,19 @@ slurm:
     gres: gpu:1       # num GPUs
     mem: 10G          # memory
     cpus-per-task: 4  # num cores
-    time: 1-00:30     # max time, D-HH:MM
+    time: 0-08:45     # max time, D-HH:MM
 
 fixed:
 
   model_params:
-    label: APPNP
-    model: APPNP
-    n_hidden: 64
-    K: 10
+    label: GATv2+LP
+    model: GATv2
+    n_heads: 8
+    n_features_per_head: 8
+    use_label_propagation: True
+    lp_layers: 50
+    lp_alpha: 0.7
+    lp_use_clamping: False
 
   data_params:
     inductive_samples: 1000
@@ -38,7 +42,7 @@ grid:
       #- "random"
       #- "l2-weak"
       - "nettack"
-
+  
   seed:
     type: choice
     options:
@@ -60,11 +64,11 @@ K01:
 
     model_params:
       dropout: 0.0
-      alpha: 0.05
+      dropout_neighbourhood: 0.6
 
     train_params:
       lr: 0.10
-      weight_decay: 0.001
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
@@ -85,11 +89,11 @@ K05:
 
     model_params:
       dropout: 0.0
-      alpha: 0.05
+      dropout_neighbourhood: 0.3
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.001
+      lr: 0.010
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
@@ -110,11 +114,11 @@ K1:
 
     model_params:
       dropout: 0.0
-      alpha: 0.
+      dropout_neighbourhood: 0.3
 
     train_params:
       lr: 0.10
-      weight_decay: 0.001
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:
@@ -135,11 +139,11 @@ K15:
 
     model_params:
       dropout: 0.0
-      alpha: 0.10
+      dropout_neighbourhood: 0.6
 
     train_params:
-      lr: 0.01
-      weight_decay: 0.001
+      lr: 0.10
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
@@ -160,11 +164,11 @@ K2:
 
     model_params:
       dropout: 0.0
-      alpha: 0.20
+      dropout_neighbourhood: 0.6
 
     train_params:
-      lr: 0.01
-      weight_decay: 0.010
+      lr: 0.10
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:
@@ -185,11 +189,11 @@ K5:
 
     model_params:
       dropout: 0.0
-      alpha: 0.20
+      dropout_neighbourhood: 0.0
 
     train_params:
       lr: 0.10
-      weight_decay: 0.100
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:

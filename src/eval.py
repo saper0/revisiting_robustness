@@ -103,8 +103,13 @@ def evaluate_robustness(model: Optional[nn.Module],
     c_gnn_higher_robust = 0 # Number of times GNN is "overly robust"
     c_bayes_gnn_equal_robust = 0 # Number of times GNN has perfect robustness 
                                  # w.r.t. BC
-
+    
     n = y_np.size
+    if "max_robustness" in attack_params:
+        max_robustness = attack_params["max_robustness"]
+    else:
+        # Nettack (or any other attack) had possibility to remove all same-class and add all different-class edges
+        max_robustness = y_np.size - 1
     if model is not None:
         model.eval()
     for i in tqdm(range(inductive_samples)):
@@ -166,8 +171,7 @@ def evaluate_robustness(model: Optional[nn.Module],
         while bayes_separable or gnn_separable:
             #print(f"{c_robustness}: Bayes_sep: {bayes_separable}; GNN_sep: {gnn_separable}")
             adv_edge = attack.create_adversarial_pert()
-            if c_robustness >= y_np.size - 1:
-                # Nettack had possibility to remove all same-class and add all different-class edges
+            if c_robustness >= max_robustness:
                 adv_edge = None
             if adv_edge is not None:
                 u, v = adv_edge

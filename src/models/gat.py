@@ -3,7 +3,7 @@ from typing import Tuple, Union
 from torch import nn
 from torch import Tensor
 from torch_geometric.data import Data
-from torch_geometric.nn import GATConv
+from torch_geometric.nn import GATConv, GATv2Conv
 from torch_sparse import SparseTensor
 from torchtyping import TensorType
 
@@ -56,24 +56,44 @@ class GAT(nn.Module):
                  bias: bool = True,
                  dropout: float = 0.6,
                  dropout_neighourhood: float = 0.6,
-                 add_self_loops: bool = True, **kwargs):
+                 add_self_loops: bool = True, 
+                 gat_v2: bool = False,
+                 **kwargs):
         super().__init__()
-        self.gat1 = GATConv(in_channels=n_features, 
-                            out_channels=n_features_per_head,
-                            heads=n_heads, 
-                            concat=True, 
-                            negative_slope=negative_slope,
-                            dropout=dropout_neighourhood,
-                            add_self_loops=add_self_loops,
-                            bias=bias)
-        self.gat2 = GATConv(in_channels=n_heads*n_features_per_head,
-                            out_channels=n_classes,
-                            heads=1,
-                            concat=False,
-                            negative_slope=negative_slope,
-                            dropout=dropout_neighourhood,
-                            add_self_loops=add_self_loops,
-                            bias=bias)
+        if not gat_v2:
+            self.gat1 = GATConv(in_channels=n_features, 
+                                out_channels=n_features_per_head,
+                                heads=n_heads, 
+                                concat=True, 
+                                negative_slope=negative_slope,
+                                dropout=dropout_neighourhood,
+                                add_self_loops=add_self_loops,
+                                bias=bias)
+            self.gat2 = GATConv(in_channels=n_heads*n_features_per_head,
+                                out_channels=n_classes,
+                                heads=1,
+                                concat=False,
+                                negative_slope=negative_slope,
+                                dropout=dropout_neighourhood,
+                                add_self_loops=add_self_loops,
+                                bias=bias)
+        else:
+            self.gat1 = GATv2Conv(in_channels=n_features, 
+                                out_channels=n_features_per_head,
+                                heads=n_heads, 
+                                concat=True, 
+                                negative_slope=negative_slope,
+                                dropout=dropout_neighourhood,
+                                add_self_loops=add_self_loops,
+                                bias=bias)
+            self.gat2 = GATv2Conv(in_channels=n_heads*n_features_per_head,
+                                out_channels=n_classes,
+                                heads=1,
+                                concat=False,
+                                negative_slope=negative_slope,
+                                dropout=dropout_neighourhood,
+                                add_self_loops=add_self_loops,
+                                bias=bias)
         self.dropout = nn.Dropout(dropout, inplace=False)
         self.activation = activation
 

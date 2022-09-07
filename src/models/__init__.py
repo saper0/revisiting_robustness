@@ -30,6 +30,8 @@ def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
         return DenseGCN(activation="Identity", **hyperparams)
     if hyperparams['model'] == "GAT":
         return GAT(**hyperparams)
+    if hyperparams['model'] == "GATv2":
+        return GAT(gat_v2=True, **hyperparams)
     if hyperparams['model'] == "GCN":
         return GCN(**hyperparams)
     if hyperparams['model'] is None:
