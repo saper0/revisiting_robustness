@@ -4,6 +4,8 @@ from src.models.appnp import APPNP
 from src.models.gat import GAT
 from src.models.gcn import GCN, DenseGCN
 from src.models.lp import LP
+from src.models.mlp import MLP
+from src.models.graphsage import GraphSAGE
 from src.models.sgc import SGC
 
 
@@ -38,6 +40,10 @@ def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
         return None
     if hyperparams['model'] == "SGC":
         return SGC(**hyperparams)
+    if hyperparams['model'] == "GraphSAGE":
+        return GraphSAGE(**hyperparams)
+    if hyperparams['model'] == "MLP":
+        return MLP(**hyperparams)
     raise ValueError("Specified model not found.")
 
 

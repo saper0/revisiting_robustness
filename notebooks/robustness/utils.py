@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 import pandas as pd
+import scipy.stats
 
 
 URI = "mongodb://gosl:Wuyg6KTV@fs.kdd.in.tum.de:27017/gosl?authMechanism=SCRAM-SHA-1"
@@ -68,28 +69,32 @@ def average_dict(target: Dict[str, Any]):
     for key in keys:
         item = target[key]
         if isinstance(item, dict):
-            avg_dict, std_dict = average_subdict(item)
+            avg_dict, std_dict, sem_dict = average_subdict(item)
+            target["sem_" + key] = sem_dict
             target["avg_" + key] = avg_dict
             target["std_" + key] = std_dict
         else:
             assert len(target[key]) > 0
+            target["sem_" + key] = scipy.stats.sem(item, ddof=0)
             target["avg_" + key] = np.mean(item)
             target["std_" + key] = np.std(item)
 
 
 def average_subdict(subdict: Dict[str, Any]):
     """Return a dictionary with averaged and a dictionary with standard deviation
-    values for each element."""
+    values and standard error of the mean for each element."""
     keys = [key for key in subdict]
     avg_dict = {}
     std_dict = {}
+    sem_dict = {}
     for key in keys:
         item = subdict[key]
         assert not isinstance(item, dict)
         assert len(subdict[key]) > 0
         avg_dict[key] = np.mean(item)
         std_dict[key] = np.std(item)
-    return avg_dict, std_dict
+        sem_dict[key] = scipy.stats.sem(item, ddof=0)
+    return avg_dict, std_dict, sem_dict
 
 
 class Experiment:
@@ -269,19 +274,17 @@ class Experiment:
             Rover = min_changes_to_flip_overrob_v2_l[-1]
             Radv = 1 - min_changes_to_flip_underrob_l[-1]
             f1_min_changes_v2_l.append(2 * Rover * Radv / (Rover + Radv))
-        if self.label == "APPNP" and False:
-            print(over_robustness_l)
         # All Robustness Statistics Attributes
         self.avg_robustness_f_wrt_y = np.mean(rob_f_wrt_y_l)
-        self.std_robustness_f_wrt_y = np.std(rob_f_wrt_y_l)
+        self.std_robustness_f_wrt_y = scipy.stats.sem(rob_f_wrt_y_l)
         self.avg_robustness_g_wrt_y = np.mean(rob_g_wrt_y_l)
-        self.std_robustness_g_wrt_y = np.std(rob_g_wrt_y_l)
+        self.std_robustness_g_wrt_y = scipy.stats.sem(rob_g_wrt_y_l)
         self.avg_robustness_f_wrt_g = np.mean(rob_f_wrt_g_l)
-        self.std_robustness_f_wrt_g = np.std(rob_f_wrt_g_l)
+        self.std_robustness_f_wrt_g = scipy.stats.sem(rob_f_wrt_g_l)
         self.avg_over_robustness = np.mean(over_robustness_l)
-        self.std_over_robustness = np.std(over_robustness_l)
+        self.std_over_robustness = scipy.stats.sem(over_robustness_l)
         self.avg_over_robustness_v2 = np.mean(over_robustness_v2_l)
-        self.std_over_robustness_v2 = np.std(over_robustness_v2_l)
+        self.std_over_robustness_v2 = scipy.stats.sem(over_robustness_v2_l)
         self.relative_over_robustness = self.avg_robustness_f_wrt_y / self.avg_robustness_g_wrt_y
         # see https://www.geol.lsu.edu/jlorenzo/geophysics/uncertainties/Uncertaintiespart2.html#muldiv
         self.std_relative_over_robustness = \
@@ -289,30 +292,30 @@ class Experiment:
              + self.std_robustness_g_wrt_y / self.avg_robustness_g_wrt_y) \
                 * self.relative_over_robustness 
         self.avg_adv_robustness = np.mean(adv_robustness_l)
-        self.std_adv_robustness = np.std(adv_robustness_l)
+        self.std_adv_robustness = scipy.stats.sem(adv_robustness_l)
         self.avg_under_robustness = np.mean(under_robustness_l)
-        self.std_under_robustness = np.std(under_robustness_l)
+        self.std_under_robustness = scipy.stats.sem(under_robustness_l)
         self.relative_adv_robustness = self.avg_robustness_f_wrt_g / self.avg_robustness_g_wrt_y
         self.std_relative_adv_robustness = \
             (self.std_robustness_f_wrt_g / self.avg_robustness_f_wrt_g
              + self.std_robustness_g_wrt_y / self.avg_robustness_g_wrt_y) \
                 * self.relative_adv_robustness
         self.avg_min_changes_to_flip_overrob = np.mean(min_changes_to_flip_overrob_l)
-        self.std_min_changes_to_flip_overrob = np.std(min_changes_to_flip_overrob_l)
+        self.std_min_changes_to_flip_overrob = scipy.stats.sem(min_changes_to_flip_overrob_l)
         self.avg_min_changes_to_flip_overrob_v2 = np.mean(min_changes_to_flip_overrob_v2_l)
-        self.std_min_changes_to_flip_overrob_v2 = np.std(min_changes_to_flip_overrob_v2_l)
+        self.std_min_changes_to_flip_overrob_v2 = scipy.stats.sem(min_changes_to_flip_overrob_v2_l)
         self.avg_min_changes_to_flip_advrob = np.mean(min_changes_to_flip_advrob_l)
-        self.std_min_changes_to_flip_advrob = np.std(min_changes_to_flip_advrob_l)
+        self.std_min_changes_to_flip_advrob = scipy.stats.sem(min_changes_to_flip_advrob_l)
         self.avg_min_changes_to_flip_underrob = np.mean(min_changes_to_flip_underrob_l)
-        self.std_min_changes_to_flip_underrob = np.std(min_changes_to_flip_underrob_l)
+        self.std_min_changes_to_flip_underrob = scipy.stats.sem(min_changes_to_flip_underrob_l)
         self.avg_f1_robustness = np.mean(f1_robustness_l)
-        self.std_f1_robustness = np.std(f1_robustness_l)
+        self.std_f1_robustness = scipy.stats.sem(f1_robustness_l)
         self.avg_f1_min_changes = np.mean(f1_min_changes_l)
-        self.std_f1_min_changes = np.std(f1_min_changes_l)
+        self.std_f1_min_changes = scipy.stats.sem(f1_min_changes_l)
         self.avg_f1_robustness_v2 = np.mean(f1_robustness_v2_l)
-        self.std_f1_robustness_v2 = np.std(f1_robustness_v2_l)
+        self.std_f1_robustness_v2 = scipy.stats.sem(f1_robustness_v2_l)
         self.avg_f1_min_changes_v2 = np.mean(f1_min_changes_v2_l)
-        self.std_f1_min_changes_v2 = np.std(f1_min_changes_v2_l)
+        self.std_f1_min_changes_v2 = scipy.stats.sem(f1_min_changes_v2_l)
         # Raw Robustness Metrics for each Seed:
         self.rob_f_wrt_y_l = np.array(rob_f_wrt_y_l)
         self.rob_g_wrt_y_l = np.array(rob_g_wrt_y_l)
@@ -725,15 +728,16 @@ class ExperimentManager:
             ordered_f_wrt_g = [f_wrt_g[str(i)] for i in x]
             if errorbars:
                 if name == "f_wrt_y" or name == "both":
-                    #axs.boxplot(ordered_f_wrt_y, showfliers=False)
+                    axs.boxplot(ordered_f_wrt_y, showfliers=True)
                     #axs.violinplot(ordered_f_wrt_y)
                     pass
                 if not bayes_added:
-                    print(len(ordered_g_wrt_y))
-                    axs.boxplot(ordered_g_wrt_y, 
-                                whiskerprops={'color' : 'tab:blue'}, 
-                                patch_artist=True,
-                                showfliers=False)
+                    #print(len(ordered_g_wrt_y))
+                    #axs.boxplot(ordered_g_wrt_y, showfliers=True)
+                                #whiskerprops={'color' : 'tab:blue'}, 
+                                #patch_artist=True,
+                    #            showfliers=True)
+                    pass
             else:
                 pass
             bayes_added = True
@@ -812,7 +816,7 @@ class ExperimentManager:
             for K in K_l:
                 f1_score = 2 * Rover_dict[label][K] * Radv_dict[label][K] / (Rover_dict[label][K] + Radv_dict[label][K])
                 y.append(np.mean(f1_score))
-                yerr.append(np.std(f1_score))
+                yerr.append(scipy.stats.sem(f1_score))
             if errorbars:
                 ax.errorbar(x, y, yerr=yerr, marker="o", label=label, capsize=3)
             else:
@@ -830,6 +834,89 @@ class ExperimentManager:
         ax.yaxis.grid()
         ax.legend()
         plt.show()
+
+    def starplot(self, name: str, attack: str, models: List[str], 
+                        K: List[float], max_degree: int=None, logplot: bool=False,
+                        errorbars: bool=True, ylabel: str=None, title: str=None):
+        """Generate starplot (w.r.t. degree plots).
+
+        Args:
+            name (str):
+                - f_wrt_y
+                - f_wrt_g
+                - both
+            attack (str): _description_
+            models (List[str]): _description_
+            K (List[float]): _description_
+            errorbars (bool, optional): _description_. Defaults to True.
+            ylabel (str, optional): _description_. Defaults to None.
+            title (str, optional): _description_. Defaults to None.
+        """
+        if max_degree is None:
+            max_degree = 0
+            for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+                avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+                max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
+                if max_deg_ > max_degree:
+                    max_degree = max_deg_
+        
+        fig, axs = plt.subplots()
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        linestyle_list = ['-', '--', ':', '-.']
+        axs.set_prop_cycle(cycler('linestyle', linestyle_list)*
+                           cycler('color', color_list))
+        bayes_added = False
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            avg_f_wrt_y = exp.robustness_statistics["avg_avg_gnn_robust_when_both"]
+            std_f_wrt_y = exp.robustness_statistics["sem_avg_gnn_robust_when_both"]
+            avg_g_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+            std_g_wrt_y = exp.robustness_statistics["sem_avg_bayes_robust_when_both"]
+            avg_f_wrt_g = exp.robustness_statistics["avg_avg_gnn_wrt_bayes_robust"]
+            std_f_wrt_g = exp.robustness_statistics["sem_avg_gnn_wrt_bayes_robust"]
+            
+            x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            x = x[x <= max_degree]
+            ordered_avg_f_wrt_y = [avg_f_wrt_y[str(i)] for i in x]
+            ordered_std_f_wrt_y = [std_f_wrt_y[str(i)] for i in x]
+            ordered_avg_g_wrt_y = [avg_g_wrt_y[str(i)] for i in x]
+            ordered_std_g_wrt_y = [std_g_wrt_y[str(i)] for i in x]
+            ordered_avg_f_wrt_g = [avg_f_wrt_g[str(i)] for i in x]
+            ordered_std_f_wrt_g = [std_f_wrt_g[str(i)] for i in x]
+            if errorbars:
+                if name == "f_wrt_y" or name == "both":
+                    axs.errorbar(ordered_avg_f_wrt_y, x,  
+                                xerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3)
+                if not bayes_added:
+                    axs.errorbar(ordered_avg_g_wrt_y, x, 
+                                xerr=ordered_std_g_wrt_y, fmt="s:", label=f"Bayes", capsize=3)
+                if name == "f_wrt_g" or name == "both":
+                    axs.errorbar(ordered_avg_f_wrt_g, x, 
+                                yerr=ordered_std_f_wrt_g, marker="o", label=f"{label} w.r.t. Bayes", capsize=3)
+            else:
+                if name == "f_wrt_y" or name == "both":
+                    axs.plot(ordered_avg_f_wrt_y, x, marker='o', label=f"{label}")
+                if not bayes_added:
+                    axs.plot(ordered_avg_g_wrt_y, x, 's:', label="Bayes")
+                if name == "f_wrt_g" or name == "both":
+                    axs.plot(ordered_avg_f_wrt_g, x, marker='o', label=f"{label} w.r.t. Bayes")
+            bayes_added = True
+        if ylabel is None:
+            ylabel=name
+        axs.set_xlabel(ylabel)
+        axs.set_ylabel("Degree")
+        if logplot:
+            axs.set_xscale('log')
+        if title is None:
+            title=name
+        axs.set_title(title)
+        axs.legend()
+        start_x, end_x = axs.get_xlim()
+        start_y, end_y = axs.get_ylim()
+        #axs.xaxis.set_ticks(np.arange(0, end_x, step=1))
+        #axs.yaxis.set_ticks(np.arange(0, end_y, step=1))
+        plt.grid()
+        plt.show()
+
 
     def model_iterator(
         self, attack: str, models: List[str]

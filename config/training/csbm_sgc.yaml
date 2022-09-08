@@ -1,5 +1,5 @@
 seml:
-  name: trn_sgc
+  name: trn_sgc_v2
   executable: exp_train.py
   project_root_dir: ../../
   output_dir: log/training
@@ -13,10 +13,10 @@ slurm:
     time: 0-00:30     # max time, D-HH:MM
 
 fixed:
+
   model_params:
     label: SGC
-    model: DenseGCN
-    activation: Identity
+    model: SGC
 
   train_params:
     inductive: True
@@ -34,6 +34,8 @@ grid:
         - 1
         - 1.5
         - 2
+        - 3
+        - 4
         - 5
 
   model_params:
@@ -44,10 +46,20 @@ grid:
         - 0.3
         - 0.5
 
+    K:
+      type: choice
+      options:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+
   train_params:
     lr: 
       type: choice
       options:
+        - 0.2
         - 0.1
         - 0.01
         - 0.001

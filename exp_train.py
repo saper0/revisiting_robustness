@@ -225,7 +225,7 @@ def run(data_params: Dict[str, Any],
                 model_params["lp_alpha"], 
                 data_params["classes"],
                 post_step).to(device)
-    #logging.info(model)
+    logging.info(model)
 
     # Train Model
     if train_params["inductive"]:

@@ -1,5 +1,5 @@
 seml:
-  name: trn_sgc_v2
+  name: trn_sage
   executable: exp_train.py
   project_root_dir: ../../
   output_dir: log/training
@@ -13,13 +13,12 @@ slurm:
     time: 0-00:30     # max time, D-HH:MM
 
 fixed:
-
-  model_params:
-    label: SGCv2
-    model: SGC
-
   train_params:
     inductive: True
+
+  model_params:
+    label: MLP
+    model: MLP
 
   other_params:
     sacred_metrics: False
@@ -34,9 +33,19 @@ grid:
         - 1
         - 1.5
         - 2
+        - 3
+        - 4
         - 5
 
   model_params:
+    hidden_channels:
+      type: choice
+      options:
+        - 32
+        - 64
+        - 128
+        - 256
+
     dropout:
       type: choice
       options:
@@ -44,24 +53,13 @@ grid:
         - 0.3
         - 0.5
 
-    K:
-      type: choice
-      options:
-        - 1
-        - 2
-        - 3
-        - 4
-        - 5
-
   train_params:
     lr: 
       type: choice
       options:
-        - 0.2
         - 0.1
         - 0.01
         - 0.001
-        - 0.0001
 
     weight_decay:
       type: choice
@@ -75,4 +73,3 @@ grid:
     min: 0
     max: 10
     step: 1
-        
