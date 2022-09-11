@@ -9,7 +9,7 @@ from src.models.graphsage import GraphSAGE
 from src.models.sgc import SGC
 
 
-MODEL_TYPE = Union[APPNP, DenseGCN, GAT, GCN, SGC, None]
+MODEL_TYPE = Union[APPNP, DenseGCN, GAT, GCN, SGC, MLP, GraphSAGE, None]
 
         
 def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
@@ -53,5 +53,7 @@ __all__ = [GCN,
            DenseGCN,
            SGC,
            LP,
+           MLP,
+           GraphSAGE,
            create_model,
            MODEL_TYPE]

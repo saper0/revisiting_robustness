@@ -33,6 +33,11 @@ fixed:
 
 grid:
   attack_params:
+    max_robustness:
+      type: choice
+      options:
+        - 100
+        #- 999
     attack: 
       type: choice
       options:
@@ -167,6 +172,54 @@ K2:
         patience: 300
         max_epochs: 3000
 
+K3:
+  fixed:
+    data_params:
+      K: 3.0
+
+    model_params:
+      dropout: 0.5
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.0010
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0010
+        patience: 300
+        max_epochs: 3000
+
+K4:
+  fixed:
+    data_params:
+      K: 4.0
+
+    model_params:
+      dropout: 0.0
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.0100
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0100
+        patience: 300
+        max_epochs: 3000
+        
 K5:
   fixed:
     data_params:

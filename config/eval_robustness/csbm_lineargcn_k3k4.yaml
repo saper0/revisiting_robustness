@@ -1,0 +1,97 @@
+seml:
+  name: eval_robustness_lineargcn
+  executable: exp_eval_robustness.py
+  project_root_dir: ../../
+  output_dir: log/eval_robustness/
+
+slurm:
+  experiments_per_job: 1
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 10G          # memory
+    cpus-per-task: 4  # num cores
+    time: 0-08:30     # max time, D-HH:MM
+
+fixed:
+  model_params:
+    label: LinearGCN
+    model: LinearGCN
+    n_filters: 64
+
+  data_params:
+    inductive_samples: 1000
+  
+  train_params:
+    inductive: True
+
+  other_params:
+    sacred_metrics: False
+
+grid:
+  attack_params:
+    max_robustness:
+      type: choice
+      options:
+        #- 100
+        - 999
+    attack: 
+      type: choice
+      options:
+      - "l2"
+      - "random"
+      - "l2-weak"
+      - "nettack"
+  
+  seed:
+    type: range
+    min: 0
+    max: 10
+    step: 1
+
+K3:
+  fixed:
+    data_params:
+      K: 3.0
+
+    model_params:
+      dropout: 0.5
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.0010
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0010
+        patience: 300
+        max_epochs: 3000
+
+K4:
+  fixed:
+    data_params:
+      K: 4.0
+
+    model_params:
+      dropout: 0.0
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.0100
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0100
+        patience: 300
+        max_epochs: 3000

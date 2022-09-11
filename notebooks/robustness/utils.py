@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from pymongo import MongoClient
 from typing import Any, Dict, Iterator, List, Tuple, Union
 
@@ -158,20 +159,15 @@ class Experiment:
         average_dict(self.prediction_statistics)
         average_dict(self.robustness_statistics)
         self.avg_training_loss = np.mean(final_training_loss_l)
-        self.std_training_loss = np.std(final_training_loss_l)
+        self.std_training_loss = scipy.stats.sem(final_training_loss_l)
         self.avg_training_accuracy = np.mean(final_training_accuracy_l)
-        self.std_training_accuracy = np.std(final_training_accuracy_l)
+        self.std_training_accuracy = scipy.stats.sem(final_training_accuracy_l)
         self.avg_validation_loss = np.mean(final_validation_loss_l)
         self.validation_loss = final_validation_loss_l
-        self.std_validation_loss = np.std(final_validation_loss_l)
+        self.std_validation_loss = scipy.stats.sem(final_validation_loss_l)
         self.avg_validation_accuracy = np.mean(final_validation_accuracy_l)
-        self.std_validation_accuracy = np.std(final_validation_accuracy_l)
+        self.std_validation_accuracy = scipy.stats.sem(final_validation_accuracy_l)
         self.validation_accuracy = final_validation_accuracy_l
-        if False:
-            print(f"{self.label} on K={self.K} has {self.avg_training_accuracy*100:.1f}"
-                f"+-{self.std_training_accuracy*100:.1f}% trn acc and "
-                f"{self.avg_validation_accuracy*100:.1f}+-{self.std_validation_accuracy*100:.1f}%"
-                f" val acc.")
           
     def calculate_robustness_metrics(self):
         self.count_zero_degree_nodes(verbose=False)
@@ -348,12 +344,12 @@ class Experiment:
         if name == "test-accuracy":
             n = self.hyperparameters["data_params"]["inductive_samples"]
             gnn_test_acc = self.prediction_statistics["avg_c_acc_gnn"] / n
-            gnn_test_acc_std = self.prediction_statistics["std_c_acc_gnn"] / n
+            gnn_test_acc_std = self.prediction_statistics["sem_c_acc_gnn"] / n
             return gnn_test_acc, gnn_test_acc_std
         if name == "test-accuracy-bayes":
             n = self.hyperparameters["data_params"]["inductive_samples"]
             bayes_test_acc = self.prediction_statistics["avg_c_acc_bayes"] / n
-            bayes_test_acc_std = self.prediction_statistics["std_c_acc_bayes"] / n
+            bayes_test_acc_std = self.prediction_statistics["sem_c_acc_bayes"] / n
             return bayes_test_acc, bayes_test_acc_std
         if name == "relative-changes-to-flip-overrobust":
             return self.avg_min_changes_to_flip_overrob.item(), self.std_min_changes_to_flip_overrob.item()
@@ -431,17 +427,21 @@ class ExperimentManager:
         for exp_spec in experiments:
             if "collection" not in exp_spec:
                 exp_spec["collection"] = "runs"
-            exp_list = self.load_experiments(exp_spec["start_id"],
-                                             exp_spec["end_id"],
-                                             exp_spec["n_seeds"],
-                                             exp_spec["label"],
-                                             exp_spec["collection"])
-            for exp in exp_list:
-                if exp.attack not in self.experiments_dict:
-                    self.experiments_dict[exp.attack] = {}
-                if exp.label not in self.experiments_dict[exp.attack]:
-                    self.experiments_dict[exp.attack][exp.label] = {}
-                self.experiments_dict[exp.attack][exp.label][exp.K] = exp
+            if not isinstance(exp_spec["start_id"], Iterable):
+                exp_spec["start_id"] = [exp_spec["start_id"]]
+                exp_spec["end_id"] = [exp_spec["end_id"]]
+            for start_id, end_id in zip(exp_spec["start_id"], exp_spec["end_id"]):
+                exp_list = self.load_experiments(start_id,
+                                                 end_id,
+                                                 exp_spec["n_seeds"],
+                                                 exp_spec["label"],
+                                                 exp_spec["collection"])
+                for exp in exp_list:
+                    if exp.attack not in self.experiments_dict:
+                        self.experiments_dict[exp.attack] = {}
+                    if exp.label not in self.experiments_dict[exp.attack]:
+                        self.experiments_dict[exp.attack][exp.label] = {}
+                    self.experiments_dict[exp.attack][exp.label][exp.K] = exp
 
     def get_robustness_table(self, attack: str, models: List[str], 
                              K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
@@ -470,7 +470,8 @@ class ExperimentManager:
 
     def plot(self, name: str, attack: str, models: List[str], 
              errorbars: bool=True, ylabel: str=None, title: str=None,
-             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
+             spacing: str="normal",
+             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
         """Plot relative or absolute over-robustness measure.
 
         Args:
@@ -519,13 +520,23 @@ class ExperimentManager:
                         raise ValueError("BC requested but name not f_wrt_y")
                     y_bc.append(value)
                     y_err_bc.append(std)
+            sort_ids = np.argsort(x)
+            if spacing == "even":
+                x = [i for i in range(len(K_l))]
+            else:
+                x = K_l
+            y = np.array(y)[sort_ids]
             if errorbars:
+                y_err = np.array(y_err)[sort_ids]
                 ax.errorbar(x, y, yerr=y_err, marker="o", label=label, capsize=3)
                 if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
+                    y_err_bc = np.array(y_err_bc)[sort_ids] 
                     ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", label="Bayes Classifier", capsize=3)
             else:
                 ax.plot(x, y, marker="o", label=label)
                 if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
                     ax.plot(x, y_bc, "s:", label="Bayes Classifier")
             added_bayes = True
         if ylabel is None:
@@ -534,10 +545,19 @@ class ExperimentManager:
         if title is None:
             title=name
         ax.set_title(title)
-        ax.set_xticks(K_l, minor=False)
+        if spacing == "log":
+            ax.set_xscale('log')
+            xticks = np.sort(K_l.append([0.2, 10]))
+            ax.set_xticks(xticks, minor=True)
+        elif spacing == "even":
+            ax.xaxis.set_ticks(x, minor=False)
+            ax.xaxis.set_ticklabels(K_l)
+            ax.set_xlim(left=-0.3)
+        else:
+            ax.set_xticks(K_l, minor=False)
+            ax.set_xlim(left=0.)
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
         ax.set_xlabel("K")
-        ax.set_xlim(left=0.)
         ax.yaxis.grid()
         ax.legend()
         plt.show()
@@ -754,7 +774,7 @@ class ExperimentManager:
         plt.show()
 
     def plot_f1(self, name: str, attack_overrobustness: str, attack_advrobustness: str,
-                models: List[str], errorbars: bool=True, 
+                models: List[str], errorbars: bool=True, spacing: str="normal",
                 label: str=None, title: str=None, ylabel: str=None, 
                 K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
         """Plot f1 scores to trade of between over- and adv. robustness.
@@ -810,7 +830,10 @@ class ExperimentManager:
                 assert False
         # Calculate F1-Score
         for label in Rover_dict:
-            x = K_l
+            if spacing == "even":
+                x = [i for i in range(len(K_l))]
+            else:
+                x = K_l
             y = []
             yerr = []
             for K in K_l:
@@ -827,10 +850,20 @@ class ExperimentManager:
         if title is None:
             title=name
         ax.set_title(title)
-        ax.set_xticks(K_l, minor=False)
+        if spacing == "log":
+            ax.set_xscale('log')
+            xticks = np.sort(K_l + [0.2, 10])
+            # or symlog with only k=10
+            ax.set_xticks(xticks, minor=True)
+        elif spacing == "even":
+            ax.xaxis.set_ticks(x, minor=False)
+            ax.xaxis.set_ticklabels(K_l)
+            ax.set_xlim(left=-0.3)
+        else:
+            ax.set_xticks(K_l, minor=False)
+            ax.set_xlim(left=0.)
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
         ax.set_xlabel("K")
-        ax.set_xlim(left=0.)
         ax.yaxis.grid()
         ax.legend()
         plt.show()

@@ -209,6 +209,8 @@ class ExperimentLoader:
         experiments = [self.load_experiment(i, n_seeds, use_seeds) for i in experiment_ids]
         experiments_with_K = []
         for experiment in experiments:
+            #if experiment.hyperparameters["model_params"]["hidden_channels"] != 64:
+            #    continue
             if experiment.K == K:
                 experiments_with_K.append(experiment)
         experiments_with_K.sort()

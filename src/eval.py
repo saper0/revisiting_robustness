@@ -2,6 +2,7 @@ from collections import Counter
 from typing import Any, Dict, Optional, Union
 
 import numpy as np
+import scipy.stats
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -10,6 +11,7 @@ from src.attacks import create_attack
 from src.graph_models import GRAPH_MODEL_TYPE
 from src.models import LP
 from src.utils import accuracy
+
 
 def evaluate_robustness(model: Optional[nn.Module], 
                         label_prop: Optional[LP],
@@ -109,7 +111,7 @@ def evaluate_robustness(model: Optional[nn.Module],
         max_robustness = attack_params["max_robustness"]
     else:
         # Nettack (or any other attack) had possibility to remove all same-class and add all different-class edges
-        max_robustness = y_np.size - 1
+        max_robustness = y_np.size
     if model is not None:
         model.eval()
     for i in tqdm(range(inductive_samples)):
@@ -230,12 +232,17 @@ def evaluate_robustness(model: Optional[nn.Module],
                 if not bayes_separable_new and not gnn_separable_new:
                     c_bayes_gnn_equal_robust += 1
                     c_gnn_wrt_bayes_robust[deg_n].append(c_robustness)
-                if bayes_separable_new and not gnn_separable_new:
+                elif bayes_separable_new and not gnn_separable_new:
                     c_bayes_higher_robust += 1
                     c_gnn_wrt_bayes_robust[deg_n].append(c_robustness)
-                if not bayes_separable_new and gnn_separable_new:
+                elif not bayes_separable_new and gnn_separable_new:
                     c_gnn_higher_robust += 1
                     c_gnn_wrt_bayes_robust[deg_n].append(c_robustness)
+                elif adv_edge is None:
+                    c_bayes_gnn_equal_robust += 1
+                    c_gnn_wrt_bayes_robust[deg_n].append(c_robustness)
+                else:
+                    pass
 
             bayes_separable = bayes_separable_new if adv_edge is not None else False
             gnn_separable = gnn_separable_new if adv_edge is not None else False
@@ -245,48 +252,59 @@ def evaluate_robustness(model: Optional[nn.Module],
     avg_bayes_robust = {}
     med_bayes_robust = {}
     std_bayes_robust = {}
+    sem_bayes_robust = {}
     max_bayes_robust = {}
     for degree in c_acc_bayes_deg:
         avg_bayes_robust[f"{degree}"] = float(np.mean(c_bayes_robust[degree]))
         med_bayes_robust[f"{degree}"] = float(np.median(c_bayes_robust[degree]))
         std_bayes_robust[f"{degree}"] = float(np.std(c_bayes_robust[degree]))
+        sem_bayes_robust[f"{degree}"] = float(scipy.stats.sem(c_bayes_robust[degree], ddof=0))
         max_bayes_robust[f"{degree}"] = float(np.max(c_bayes_robust[degree]))
     avg_gnn_robust = {}
     med_gnn_robust = {}
     std_gnn_robust = {}
+    sem_gnn_robust = {}
     max_gnn_robust = {}
     for degree in c_acc_gnn_deg:
         avg_gnn_robust[f"{degree}"] = float(np.mean(c_gnn_robust[degree]))
         med_gnn_robust[f"{degree}"] = float(np.median(c_gnn_robust[degree]))
         std_gnn_robust[f"{degree}"] = float(np.std(c_gnn_robust[degree]))
+        sem_gnn_robust[f"{degree}"] = float(scipy.stats.sem(c_gnn_robust[degree], ddof=0))
         max_gnn_robust[f"{degree}"] = float(np.max(c_gnn_robust[degree]))
     avg_gnn_wrt_bayes_robust = {}
     med_gnn_wrt_bayes_robust = {}
     std_gnn_wrt_bayes_robust = {}
+    sem_gnn_wrt_bayes_robust = {}
     max_gnn_wrt_bayes_robust = {}
     # Robustness GNN w.r.t. Bayes
     for degree in c_acc_bayes_gnn_deg:
         avg_gnn_wrt_bayes_robust[f"{degree}"] = float(np.mean(c_gnn_wrt_bayes_robust[degree]))
         med_gnn_wrt_bayes_robust[f"{degree}"] = float(np.median(c_gnn_wrt_bayes_robust[degree]))
         std_gnn_wrt_bayes_robust[f"{degree}"] = float(np.std(c_gnn_wrt_bayes_robust[degree]))
+        sem_gnn_wrt_bayes_robust[f"{degree}"] = float(scipy.stats.sem(c_gnn_wrt_bayes_robust[degree], ddof=0))
+        print(c_gnn_wrt_bayes_robust)
         max_gnn_wrt_bayes_robust[f"{degree}"] = float(np.max(c_gnn_wrt_bayes_robust[degree]))
     avg_bayes_robust_when_both = {}
     med_bayes_robust_when_both = {}
     std_bayes_robust_when_both = {}
+    sem_bayes_robust_when_both = {}
     max_bayes_robust_when_both = {}
     for degree in c_acc_bayes_gnn_deg:
         avg_bayes_robust_when_both[f"{degree}"] = float(np.mean(c_bayes_robust_when_both[degree]))
         med_bayes_robust_when_both[f"{degree}"] = float(np.median(c_bayes_robust_when_both[degree]))
         std_bayes_robust_when_both[f"{degree}"] = float(np.std(c_bayes_robust_when_both[degree]))
+        sem_bayes_robust_when_both[f"{degree}"] = float(scipy.stats.sem(c_bayes_robust_when_both[degree], ddof=0))
         max_bayes_robust_when_both[f"{degree}"] = float(np.max(c_bayes_robust_when_both[degree]))
     avg_gnn_robust_when_both = {}
     med_gnn_robust_when_both = {}
     std_gnn_robust_when_both = {}
+    sem_gnn_robust_when_both = {}
     max_gnn_robust_when_both = {}
     for degree in c_acc_bayes_gnn_deg:
         avg_gnn_robust_when_both[f"{degree}"] = float(np.mean(c_gnn_robust_when_both[degree]))
         med_gnn_robust_when_both[f"{degree}"] = float(np.median(c_gnn_robust_when_both[degree]))
         std_gnn_robust_when_both[f"{degree}"] = float(np.std(c_gnn_robust_when_both[degree]))
+        sem_gnn_robust_when_both[f"{degree}"] = float(scipy.stats.sem(c_gnn_robust_when_both[degree], ddof=0))
         max_gnn_robust_when_both[f"{degree}"] = float(np.max(c_gnn_robust_when_both[degree]))
 
     return dict(
@@ -308,22 +326,27 @@ def evaluate_robustness(model: Optional[nn.Module],
                 avg_bayes_robust=avg_bayes_robust, 
                 med_bayes_robust=med_bayes_robust, 
                 std_bayes_robust=std_bayes_robust, 
+                sem_bayes_robust=sem_bayes_robust, 
                 max_bayes_robust=max_bayes_robust,
                 avg_gnn_robust=avg_gnn_robust, 
                 med_gnn_robust=med_gnn_robust, 
                 std_gnn_robust=std_gnn_robust, 
+                sem_gnn_robust=sem_gnn_robust, 
                 max_gnn_robust=max_gnn_robust,
                 avg_gnn_wrt_bayes_robust=avg_gnn_wrt_bayes_robust, 
                 med_gnn_wrt_bayes_robust=med_gnn_wrt_bayes_robust, 
                 std_gnn_wrt_bayes_robust=std_gnn_wrt_bayes_robust, 
+                sem_gnn_wrt_bayes_robust=sem_gnn_wrt_bayes_robust, 
                 max_gnn_wrt_bayes_robust=max_gnn_wrt_bayes_robust, 
                 avg_bayes_robust_when_both=avg_bayes_robust_when_both, 
                 med_bayes_robust_when_both=med_bayes_robust_when_both, 
                 std_bayes_robust_when_both=std_bayes_robust_when_both, 
+                sem_bayes_robust_when_both=sem_bayes_robust_when_both, 
                 max_bayes_robust_when_both=max_bayes_robust_when_both, 
                 avg_gnn_robust_when_both=avg_gnn_robust_when_both, 
                 med_gnn_robust_when_both=med_gnn_robust_when_both, 
                 std_gnn_robust_when_both=std_gnn_robust_when_both, 
+                sem_gnn_robust_when_both=sem_gnn_robust_when_both, 
                 max_gnn_robust_when_both=max_gnn_robust_when_both,
                 # Raw Degree-Dependent Robustness Data (For each Node)
                 c_bayes_robust=c_bayes_robust, #g|y

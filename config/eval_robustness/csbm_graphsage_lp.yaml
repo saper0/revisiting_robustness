@@ -1,8 +1,8 @@
 seml:
-  name: eval_robustness_gcn
+  name: eval_robustness_graphsage_lp
   executable: exp_eval_robustness.py
   project_root_dir: ../../
-  output_dir: log/eval_robustness
+  output_dir: log/eval_robustness/
 
 slurm:
   experiments_per_job: 1
@@ -10,15 +10,16 @@ slurm:
     gres: gpu:1       # num GPUs
     mem: 10G          # memory
     cpus-per-task: 4  # num cores
-    time: 1-00:45     # max time, D-HH:MM
+    time: 0-08:30     # max time, D-HH:MM
 
 fixed:
-
   model_params:
-    label: GATv2
-    model: GATv2
-    n_heads: 8
-    n_features_per_head: 8
+    label: GraphSAGE+LP
+    model: GraphSAGE
+    use_label_propagation: True
+    lp_layers: 50
+    lp_alpha: 0.7
+    lp_use_clamping: False
 
   data_params:
     inductive_samples: 1000
@@ -31,27 +32,24 @@ fixed:
 
 grid:
   attack_params:
+    max_robustness:
+      type: choice
+      options:
+        #- 100
+        - 999
     attack: 
       type: choice
       options:
-      #- "l2"
-      #- "random"
-      #- "l2-weak"
-      - "nettack"
+      - "l2"
+      - "random"
+      - "l2-weak"
+      #- "nettack"
   
   seed:
-    type: choice
-    options:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
-      - 7
-      - 8
-      - 9
+    type: range
+    min: 0
+    max: 10
+    step: 1
 
 K01:
   fixed:
@@ -59,12 +57,12 @@ K01:
       K: 0.1
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.6
+      dropout: 0.3
+      hidden_channels: 64
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0001
+      lr: 0.1
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
@@ -84,12 +82,12 @@ K05:
       K: 0.5
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.3
+      dropout: 0.3
+      hidden_channels: 64
 
     train_params:
-      lr: 0.010
-      weight_decay: 0.0001
+      lr: 0.1
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
@@ -109,11 +107,11 @@ K1:
       K: 1.0
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.3
+      dropout: 0.3
+      hidden_channels: 64
 
     train_params:
-      lr: 0.10
+      lr: 0.01
       weight_decay: 0.0010
 
     attack_params:
@@ -134,12 +132,12 @@ K15:
       K: 1.5
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.6
+      dropout: 0.3
+      hidden_channels: 64
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0001
+      lr: 0.01
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
@@ -159,12 +157,12 @@ K2:
       K: 2.0
 
     model_params:
-      dropout: 0.0
-      dropout_neighbourhood: 0.6
+      dropout: 0.3
+      hidden_channels: 64
 
     train_params:
       lr: 0.10
-      weight_decay: 0.0010
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
@@ -178,6 +176,56 @@ K2:
         patience: 300
         max_epochs: 3000
 
+K3:
+  fixed:
+    data_params:
+      K: 3.0
+
+    model_params:
+      dropout: 0.3
+      hidden_channels: 64
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0010
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0010
+        patience: 300
+        max_epochs: 3000
+
+K4:
+  fixed:
+    data_params:
+      K: 4.0
+
+    model_params:
+      dropout: 0.3
+      hidden_channels: 64
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0010
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0100
+        patience: 300
+        max_epochs: 3000
+
 K5:
   fixed:
     data_params:
@@ -185,11 +233,11 @@ K5:
 
     model_params:
       dropout: 0.0
-      dropout_neighbourhood: 0.0
+      hidden_channels: 64
 
     train_params:
       lr: 0.10
-      weight_decay: 0.0010
+      weight_decay: 0.010
 
     attack_params:
       surrogate_model_params:
