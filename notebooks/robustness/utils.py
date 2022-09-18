@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import copy
 from pymongo import MongoClient
 from typing import Any, Dict, Iterator, List, Tuple, Union
 
@@ -242,7 +243,7 @@ class Experiment:
                     min_changes_to_flip_overrob_v2 += 1 - (f_wrt_g_i + 1) / (f_wrt_y_i + 1)
                     min_changes_to_flip_advrob += (f_wrt_g_i + 1) / (g_wrt_y_i + 1)
                     min_changes_to_flip_underrob += 1 - min_changes_to_flip_advrob
-                c_nodes += len(g_wrt_y[deg])
+                c_nodes += len(f_wrt_g[deg])
             over_robustness_l.append(over_robustness / c_nodes)
             over_robustness_v2_l.append(1 - rob_f_wrt_g / rob_f_wrt_y)
             adv_robustness_l.append(rob_f_wrt_g / rob_g_wrt_y)
@@ -319,22 +320,37 @@ class Experiment:
         self.min_changes_to_flip_overrob_v2_l = np.array(min_changes_to_flip_overrob_v2_l)
         self.min_changes_to_flip_advrob_l = np.array(min_changes_to_flip_advrob_l)
       
-    def get_measurement(self, name: str) -> Tuple[float, float]:
-        """Return tuple: averaged measurement, std-measurement."""
+    def get_measurement(self, name: str, budget: str=None) -> Tuple[float, float]:
+        """Return tuple: averaged measurement, std-measurement.
+        
+        Budget can be None, deg+2 or int
+        """
         if name == "over-robustness":
             return self.avg_over_robustness.item(), self.std_over_robustness.item()
         if name == "over-robustness-v2":
-            return self.avg_over_robustness_v2.item(), self.std_over_robustness_v2.item()
+            if budget is None:
+                return self.avg_over_robustness_v2.item(), self.std_over_robustness_v2.item()
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
         if name == "relative-over-robustness":
             return self.relative_over_robustness.item(), self.std_relative_over_robustness.item()
         if name == "f_wrt_y":
-            return self.avg_robustness_f_wrt_y.item(), self.std_robustness_f_wrt_y.item()
+            if budget is None:
+                return self.avg_robustness_f_wrt_y.item(), self.std_robustness_f_wrt_y.item()
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
         if name == "g_wrt_y":
-            return self.avg_robustness_g_wrt_y.item(), self.std_robustness_g_wrt_y.item()
+            if budget is None:
+                return self.avg_robustness_g_wrt_y.item(), self.std_robustness_g_wrt_y.item()
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
         if name == "f_wrt_g":
             return self.avg_robustness_f_wrt_g.item(), self.std_robustness_f_wrt_g.item()
         if name == "adversarial-robustness":
-            return self.avg_adv_robustness.item(), self.std_adv_robustness.item()
+            if budget is None:
+                return self.avg_adv_robustness.item(), self.std_adv_robustness.item()
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
         if name == "relative-adversarial-robustness":
             return self.relative_adv_robustness.item(), self.std_adv_robustness.item()
         if name == "under-robustness":
@@ -362,11 +378,120 @@ class Experiment:
         if name == "f1-robustness":
             return self.avg_f1_robustness.item(), self.std_f1_robustness.item()
         if name == "f1-robustness-v2":
-            return self.avg_f1_robustness_v2.item(), self.std_f1_robustness_v2.item()
+            if budget is None:
+                return self.avg_f1_robustness_v2.item(), self.std_f1_robustness_v2.item()
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
         if name == "f1-min-changes":
             return self.avg_f1_min_changes.item(), self.std_f1_min_changes.item()
         if name == "f1-min-changes-2":
             return self.avg_f1_min_changes_v2.item(), self.std_f1_min_changes_v2.item()
+        if name == "rob_f_wrt_y_l":
+            if budget is None:
+                return self.rob_f_wrt_y_l
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
+        if name == "rob_g_wrt_y_l":
+            if budget is None:
+                return self.rob_g_wrt_y_l
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
+        if name == "rob_f_wrt_g_l":
+            if budget is None:
+                return self.rob_f_wrt_g_l
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
+        if name == "adversarial_accuracy":
+            if budget is None:
+                assert False, "Not implemented without budget."
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
+        if name == "adversarial_error":
+            if budget is None:
+                assert False, "Not implemented without budget."
+            else:
+                return self.calc_robustness_measure(name, local_budget=budget)
+
+
+    def calc_robustness_measure(self, name, local_budget: str):
+        rob_f_wrt_y_l = []
+        rob_g_wrt_y_l = []
+        rob_f_wrt_g_l = []
+        over_robustness_l = []
+        adv_robustness_l = []
+        f1_robustness_l = []
+        adversarial_accuracy_l = []
+        for experiment in self.individual_experiments:
+            result = experiment["result"]
+            robustness_statistics = result["robustness_statistics"]
+            f_wrt_y = robustness_statistics["c_gnn_robust_when_both"]
+            g_wrt_y = robustness_statistics["c_bayes_robust_when_both"]
+            f_wrt_g = robustness_statistics["c_gnn_wrt_bayes_robust"]
+            rob_f_wrt_y = 0
+            rob_g_wrt_y = 0
+            rob_f_wrt_g = 0
+            wrong_robust_examples = 0
+            c_nodes = 0
+            for deg in f_wrt_y:
+                if deg == "0":
+                    continue
+                #print(self.label, self.K)
+                #print(len(f_wrt_g[deg]), len(g_wrt_y[deg]), len(f_wrt_y[deg]))
+                #if self.label == "MLP":
+                #    if len(f_wrt_g[deg]) < len(g_wrt_y[deg]):
+                #        n = len(g_wrt_y[deg]) - len(f_wrt_g[deg])
+                #        for i in range(n):
+                #            f_wrt_g[deg].append(100)
+                #assert len(g_wrt_y[deg]) == len(f_wrt_y[deg])
+                #assert len(f_wrt_g[deg]) == len(f_wrt_y[deg])
+                for g_wrt_y_i, f_wrt_y_i, f_wrt_g_i in \
+                    zip(g_wrt_y[deg], f_wrt_y[deg], f_wrt_g[deg]):
+                    if type(local_budget) == str:
+                        budget = int(deg)+int(local_budget[4])
+                    else:
+                        budget = local_budget
+                    if f_wrt_y_i > budget:
+                        f_wrt_y_i = budget
+                    if g_wrt_y_i > budget:
+                        g_wrt_y_i = budget
+                    if f_wrt_g_i > budget:
+                        f_wrt_g_i = budget
+                    if f_wrt_y_i > g_wrt_y_i:
+                        wrong_robust_examples += 1
+                    rob_f_wrt_y += f_wrt_y_i / int(deg)
+                    rob_g_wrt_y += g_wrt_y_i / int(deg)
+                    rob_f_wrt_g += f_wrt_g_i / int(deg)
+                c_nodes += len(f_wrt_g[deg])
+            adversarial_accuracy_l.append(wrong_robust_examples / c_nodes)
+            over_robustness_l.append(1 - rob_f_wrt_g / rob_f_wrt_y)
+            adv_robustness_l.append(rob_f_wrt_g / rob_g_wrt_y)
+            rob_f_wrt_y_l.append(rob_f_wrt_y / c_nodes)
+            rob_g_wrt_y_l.append(rob_g_wrt_y / c_nodes)
+            rob_f_wrt_g_l.append(rob_f_wrt_g / c_nodes)
+            # f1 robustness v2
+            Rover = 1 - over_robustness_l[-1]
+            Radv = adv_robustness_l[-1]
+            f1_robustness_l.append(2 * Rover * Radv / (Rover + Radv))
+        if name=="over-robustness-v2":
+            return np.mean(over_robustness_l), scipy.stats.sem(over_robustness_l)
+        if name=="adversarial-robustness":
+            return np.mean(adv_robustness_l), scipy.stats.sem(adv_robustness_l)
+        if name=="f1-robustness-v2":
+            return np.mean(f1_robustness_l), scipy.stats.sem(f1_robustness_l)
+        if name=="rob_f_wrt_y_l":
+            return np.array(rob_f_wrt_y_l)
+        if name=="rob_g_wrt_y_l":
+            return np.array(rob_g_wrt_y_l)
+        if name=="rob_f_wrt_g_l":
+            return np.array(rob_f_wrt_g_l)
+        if name=="f_wrt_y":
+            return np.mean(rob_f_wrt_y_l), scipy.stats.sem(rob_f_wrt_y_l)
+        if name=="g_wrt_y":
+            return np.mean(rob_g_wrt_y_l), scipy.stats.sem(rob_g_wrt_y_l)
+        if name=="adversarial_accuracy":
+            return 1-np.mean(adversarial_accuracy_l), scipy.stats.sem(adversarial_accuracy_l)
+        if name=="adversarial_error":
+            return np.mean(adversarial_accuracy_l), scipy.stats.sem(adversarial_accuracy_l)
 
 
 class ExperimentManager:
@@ -468,9 +593,48 @@ class ExperimentManager:
         f.columns = columns
         return f
 
+    def get_value_in_table(self, name: str, attack: str, models: List[str],
+                           budget: str=None, 
+                           K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
+        exp_l = []
+        columns = {}
+        for label, K, exp in self.experiment_iterator(attack, models, K_l):
+            key = str(K)
+            if key not in columns:
+                columns[key] = {}
+            mean, std = exp.get_measurement(name, budget)
+            columns[key][label] = f"{mean:.2f}+-{std:.2f}"
+        f = pd.DataFrame.from_dict(columns)
+        return f
+
+    def get_style(self, label: str):
+        color_dict = {
+            "MLP": 'r',
+            "GCN": 'tab:green', 
+            "APPNP": 'lime', 
+            "SGC": "b",
+            "GAT": "slategrey",
+            "GATv2": "k",
+            "GraphSAGE": "lightsteelblue",
+            "LP": "wheat"
+        }
+        linestyle_dict = {
+            "LP": '--'
+        }
+        use_color=""
+        linestyle="-"
+        for key, color in color_dict.items():
+            sep_labels = label.split("+")
+            if sep_labels[0] == key:
+                use_color = color
+                if len(sep_labels) == 2 or sep_labels[0] == "LP":
+                    linestyle = "--"
+        return use_color, linestyle
+
     def plot(self, name: str, attack: str, models: List[str], 
              errorbars: bool=True, ylabel: str=None, title: str=None,
-             spacing: str="normal",
+             spacing: str="normal", legend_loc="best", legend_cols: int=None,
+             budget: str=None, yspacing: str="normal", 
              K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
         """Plot relative or absolute over-robustness measure.
 
@@ -493,10 +657,18 @@ class ExperimentManager:
             K_l:List[float]=[0.1, 0.5, 1, 1.5, 2, 5]. White-list
         """
         fig, ax = plt.subplots()
-        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
-        linestyle_list = ['-', '--', ':', '-.']
-        ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
-                          cycler('color', color_list))
+        #color_list = ['r', 
+        #              'tab:green', 
+        #              'b', 
+        #              'lime', 
+        #              'slategrey', 
+        #              'k', 
+        #              "lightsteelblue",
+        #              "antiquewhite",
+        #              ]
+        #linestyle_list = ['-', '--', ':', '-.']
+        #ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
+        #                  cycler('color', color_list))
         added_bayes = False
         for label, exp_by_k in self.model_iterator(attack, models):
             x = []
@@ -508,12 +680,12 @@ class ExperimentManager:
                 if K not in K_l:
                     continue
                 x.append(K)
-                value, std = exp.get_measurement(name)
+                value, std = exp.get_measurement(name, budget)
                 y.append(value)
                 y_err.append(std)
                 if "BC" in models and not added_bayes:
                     if name == "f_wrt_y":
-                        value, std = exp.get_measurement("g_wrt_y")
+                        value, std = exp.get_measurement("g_wrt_y", budget)
                     elif name == "test-accuracy":
                         value, std = exp.get_measurement("test-accuracy-bayes")
                     else:
@@ -526,40 +698,55 @@ class ExperimentManager:
             else:
                 x = K_l
             y = np.array(y)[sort_ids]
+            color, linestyle = self.get_style(label)
             if errorbars:
                 y_err = np.array(y_err)[sort_ids]
-                ax.errorbar(x, y, yerr=y_err, marker="o", label=label, capsize=3)
+                ax.errorbar(x, y, yerr=y_err, marker="o", color=color, linestyle=linestyle,
+                            label=label, capsize=3)
                 if "BC" in models and not added_bayes:
                     y_bc = np.array(y_bc)[sort_ids]
                     y_err_bc = np.array(y_err_bc)[sort_ids] 
                     ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", label="Bayes Classifier", capsize=3)
             else:
-                ax.plot(x, y, marker="o", label=label)
+                ax.plot(x, y, marker="o",  color=color, linestyle=linestyle, 
+                        label=label)
                 if "BC" in models and not added_bayes:
                     y_bc = np.array(y_bc)[sort_ids]
                     ax.plot(x, y_bc, "s:", label="Bayes Classifier")
             added_bayes = True
         if ylabel is None:
             ylabel=name
+        
+        ax.xaxis.get_major_formatter()._usetex = False
+        ax.yaxis.get_major_formatter()._usetex = False
         ax.set_ylabel(ylabel)
         if title is None:
             title=name
         ax.set_title(title)
+        if yspacing == "log":
+            ax.set_yscale('log')
         if spacing == "log":
             ax.set_xscale('log')
             xticks = np.sort(K_l.append([0.2, 10]))
             ax.set_xticks(xticks, minor=True)
         elif spacing == "even":
             ax.xaxis.set_ticks(x, minor=False)
-            ax.xaxis.set_ticklabels(K_l)
+            xticks = [f"{K}" for K in K_l]
+            ax.xaxis.set_ticklabels(xticks)
             ax.set_xlim(left=-0.3)
         else:
             ax.set_xticks(K_l, minor=False)
             ax.set_xlim(left=0.)
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
-        ax.set_xlabel("K")
+        ax.set_xlabel(r"K")
         ax.yaxis.grid()
-        ax.legend()
+        if legend_cols is None:
+            ax.legend(loc=legend_loc)
+        else:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.legend(loc=legend_loc, ncol=legend_cols, shadow=False,
+                      bbox_to_anchor=(1, 0), frameon=False)
         plt.show()
 
     def plot_wrt_degree(self, name: str, attack: str, models: List[str], 
@@ -775,7 +962,8 @@ class ExperimentManager:
 
     def plot_f1(self, name: str, attack_overrobustness: str, attack_advrobustness: str,
                 models: List[str], errorbars: bool=True, spacing: str="normal",
-                label: str=None, title: str=None, ylabel: str=None, 
+                label: str=None, title: str=None, ylabel: str=None, budget=None,
+                legend_loc="best", 
                 K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
         """Plot f1 scores to trade of between over- and adv. robustness.
 
@@ -800,14 +988,17 @@ class ExperimentManager:
         Rover_dict = {}
         for label, K, exp in self.experiment_iterator(attack_overrobustness, 
                                                       models, K_l):
+            rob_g_wrt_y_l = exp.get_measurement("rob_g_wrt_y_l", budget)
+            rob_f_wrt_y_l = exp.get_measurement("rob_f_wrt_y_l", budget)
+            rob_f_wrt_g_l = exp.get_measurement("rob_f_wrt_g_l", budget)
             if label not in Rover_dict:
                 Rover_dict[label] = {}
             if name == "f1-robustness":
-                Rover_dict[label][K] = np.minimum(exp.rob_g_wrt_y_l / exp.rob_f_wrt_y_l, 1)
+                Rover_dict[label][K] = np.minimum(rob_g_wrt_y_l / rob_f_wrt_y_l, 1)
             elif name == "f1-min-changes":
-                Rover_dict[label][K] = np.minimum((exp.rob_g_wrt_y_l + 1) / (exp.rob_f_wrt_y_l + 1), 1)
+                Rover_dict[label][K] = np.minimum((rob_g_wrt_y_l + 1) / (rob_f_wrt_y_l + 1), 1)
             elif name == "f1-robustness-v2":
-                Rover_dict[label][K] = exp.rob_f_wrt_g_l / exp.rob_f_wrt_y_l
+                Rover_dict[label][K] = rob_f_wrt_g_l / rob_f_wrt_y_l
             elif name == "f1-min-changes-v2":
                 Rover_dict[label][K] = 1 - exp.min_changes_to_flip_overrob_v2_l
             else:
@@ -816,14 +1007,17 @@ class ExperimentManager:
         Radv_dict = {}
         for label, K, exp in self.experiment_iterator(attack_advrobustness,
                                                       models, K_l):
+            rob_g_wrt_y_l = exp.get_measurement("rob_g_wrt_y_l", budget)
+            rob_f_wrt_y_l = exp.get_measurement("rob_f_wrt_y_l", budget)
+            rob_f_wrt_g_l = exp.get_measurement("rob_f_wrt_g_l", budget)
             if label not in Radv_dict:
                 Radv_dict[label] = {}
             if name == "f1-robustness":
-                Radv_dict[label][K] = exp.rob_f_wrt_g_l / exp.rob_g_wrt_y_l
+                Radv_dict[label][K] = rob_f_wrt_g_l / rob_g_wrt_y_l
             elif name == "f1-min-changes":
-                Radv_dict[label][K] = (exp.rob_f_wrt_g_l + 1) / (exp.rob_g_wrt_y_l + 1)
+                Radv_dict[label][K] = (rob_f_wrt_g_l + 1) / (rob_g_wrt_y_l + 1)
             elif name == "f1-robustness-v2":
-                Radv_dict[label][K] = exp.rob_f_wrt_g_l / exp.rob_g_wrt_y_l
+                Radv_dict[label][K] = rob_f_wrt_g_l / rob_g_wrt_y_l
             elif name == "f1-min-changes-v2":
                 Radv_dict[label][K] = exp.avg_min_changes_to_flip_advrob
             else:
@@ -840,12 +1034,17 @@ class ExperimentManager:
                 f1_score = 2 * Rover_dict[label][K] * Radv_dict[label][K] / (Rover_dict[label][K] + Radv_dict[label][K])
                 y.append(np.mean(f1_score))
                 yerr.append(scipy.stats.sem(f1_score))
+            color, linestyle = self.get_style(label)
             if errorbars:
-                ax.errorbar(x, y, yerr=yerr, marker="o", label=label, capsize=3)
+                ax.errorbar(x, y, yerr=yerr, marker="o", label=label, capsize=3,
+                            color=color, linestyle=linestyle)
             else:
-                ax.plot(x, y, marker="o", label=label)
+                ax.plot(x, y, marker="o", label=label, color=color, 
+                        linestyle=linestyle)
         if ylabel is None:
-            ylabel=name
+            ylabel=name 
+        ax.xaxis.get_major_formatter()._usetex = False
+        ax.yaxis.get_major_formatter()._usetex = False
         ax.set_ylabel(ylabel)
         if title is None:
             title=name
@@ -865,12 +1064,16 @@ class ExperimentManager:
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
         ax.set_xlabel("K")
         ax.yaxis.grid()
-        ax.legend()
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc=legend_loc, ncol=1, shadow=False,
+                    bbox_to_anchor=(1, 0), frameon=False)
         plt.show()
 
     def starplot(self, name: str, attack: str, models: List[str], 
-                        K: List[float], max_degree: int=None, logplot: bool=False,
-                        errorbars: bool=True, ylabel: str=None, title: str=None):
+                 K: List[float], max_degree: int=None, logplot: bool=False,
+                 errorbars: bool=True, ylabel: str=None, title: str=None,
+                 bayes_label="Bayes"):
         """Generate starplot (w.r.t. degree plots).
 
         Args:
@@ -921,7 +1124,7 @@ class ExperimentManager:
                                 xerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3)
                 if not bayes_added:
                     axs.errorbar(ordered_avg_g_wrt_y, x, 
-                                xerr=ordered_std_g_wrt_y, fmt="s:", label=f"Bayes", capsize=3)
+                                xerr=ordered_std_g_wrt_y, fmt="s:", label=f"{bayes_label}", capsize=3)
                 if name == "f_wrt_g" or name == "both":
                     axs.errorbar(ordered_avg_f_wrt_g, x, 
                                 yerr=ordered_std_f_wrt_g, marker="o", label=f"{label} w.r.t. Bayes", capsize=3)
@@ -929,7 +1132,7 @@ class ExperimentManager:
                 if name == "f_wrt_y" or name == "both":
                     axs.plot(ordered_avg_f_wrt_y, x, marker='o', label=f"{label}")
                 if not bayes_added:
-                    axs.plot(ordered_avg_g_wrt_y, x, 's:', label="Bayes")
+                    axs.plot(ordered_avg_g_wrt_y, x, 's:', label=bayes_label)
                 if name == "f_wrt_g" or name == "both":
                     axs.plot(ordered_avg_f_wrt_g, x, marker='o', label=f"{label} w.r.t. Bayes")
             bayes_added = True
@@ -949,7 +1152,6 @@ class ExperimentManager:
         #axs.yaxis.set_ticks(np.arange(0, end_y, step=1))
         plt.grid()
         plt.show()
-
 
     def model_iterator(
         self, attack: str, models: List[str]
