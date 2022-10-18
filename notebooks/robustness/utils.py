@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from typing import Any, Dict, Iterator, List, Tuple, Union
 
 from cycler import cycler
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 import numpy as np
@@ -411,7 +412,18 @@ class Experiment:
                 assert False, "Not implemented without budget."
             else:
                 return self.calc_robustness_measure(name, local_budget=budget)
-
+        if name == "c_acc_bayes_feature":
+            n = self.hyperparameters["data_params"]["inductive_samples"]
+            return self.prediction_statistics["avg_c_acc_bayes_feature"] / n, \
+                self.prediction_statistics["std_c_acc_bayes_feature"] / n
+        if name == "c_acc_bayes_structure":
+            n = self.hyperparameters["data_params"]["inductive_samples"]
+            return self.prediction_statistics["avg_c_acc_bayes_structure"] / n, \
+                self.prediction_statistics["std_c_acc_bayes_structure"] / n
+        if name == "c_acc_bayes":
+            n = self.hyperparameters["data_params"]["inductive_samples"]
+            return self.prediction_statistics["avg_c_acc_bayes"] / n, \
+                self.prediction_statistics["std_c_acc_bayes"] / n
 
     def calc_robustness_measure(self, name, local_budget: str):
         rob_f_wrt_y_l = []
@@ -594,17 +606,46 @@ class ExperimentManager:
         return f
 
     def get_value_in_table(self, name: str, attack: str, models: List[str],
-                           budget: str=None, 
+                           budget: str=None, use_mean=True, use_std=False,
                            K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
-        exp_l = []
         columns = {}
+        added_bayes = {}
         for label, K, exp in self.experiment_iterator(attack, models, K_l):
             key = str(K)
             if key not in columns:
                 columns[key] = {}
             mean, std = exp.get_measurement(name, budget)
-            columns[key][label] = f"{mean:.2f}+-{std:.2f}"
+            if use_mean and not use_std:
+                columns[key][label] = f"{mean*100:.1f}%"
+            if not use_mean and use_std:
+                columns[key][label] = f"{std*100:.1f}%"
+            if use_mean and use_std:
+                columns[key][label] = f"{mean*100:.1f}+{std*100:.1f}%"
+            if "BC" in models and key not in added_bayes:
+                mean, std = exp.get_measurement(name+"-bayes", budget)
+                columns[key]["Bayes Classifier (BC)"] = f"{mean*100:.1f}%"
+                mean, std = exp.get_measurement("c_acc_bayes_feature", budget)
+                columns[key]["BC (Features Only)"] = f"{mean*100:.1f}%"
+                mean, std = exp.get_measurement("c_acc_bayes_structure", budget)
+                columns[key]["BC (Structure Only)"] = f"{mean*100:.1f}%"
+                added_bayes[key] = ""
         f = pd.DataFrame.from_dict(columns)
+        f = f.reindex(sorted(f.columns), axis=1)
+        return f
+
+    def get_bc_performance(self, name: str, attack: str, models: List[str],
+                           budget: str=None, 
+                           K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
+        columns = {}
+        for label in ["_feature", "_structure", ""]:
+            name = "c_acc_bayes" + label
+            for _, K, exp in self.experiment_iterator(attack, models, K_l):
+                key = str(K)
+                if key not in columns:
+                    columns[key] = {}
+                mean, std = exp.get_measurement(name, budget)
+                columns[key][name] = f"{mean*100:.1f}+-{std*100:.1f}"
+            f = pd.DataFrame.from_dict(columns)
         return f
 
     def get_style(self, label: str):
@@ -634,7 +675,8 @@ class ExperimentManager:
     def plot(self, name: str, attack: str, models: List[str], 
              errorbars: bool=True, ylabel: str=None, title: str=None,
              spacing: str="normal", legend_loc="best", legend_cols: int=None,
-             budget: str=None, yspacing: str="normal", 
+             budget: str=None, yspacing: str="normal", width=0.86, ratio=1.618,
+             titlefont=20, fontweight="bold",
              K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
         """Plot relative or absolute over-robustness measure.
 
@@ -656,7 +698,8 @@ class ExperimentManager:
             title: Title of plot. If not provided it is set to "name".
             K_l:List[float]=[0.1, 0.5, 1, 1.5, 2, 5]. White-list
         """
-        fig, ax = plt.subplots()
+        h, w = matplotlib.figure.figaspect(ratio / width)
+        fig, ax = plt.subplots(figsize=(w,h))
         #color_list = ['r', 
         #              'tab:green', 
         #              'b', 
@@ -699,14 +742,19 @@ class ExperimentManager:
                 x = K_l
             y = np.array(y)[sort_ids]
             color, linestyle = self.get_style(label)
+            if label == "GraphSAGE":
+                label = "GraphSAGE"
+            if label == "GraphSAGE+LP":
+                label = "GraphSAGE+LP"
             if errorbars:
                 y_err = np.array(y_err)[sort_ids]
                 ax.errorbar(x, y, yerr=y_err, marker="o", color=color, linestyle=linestyle,
-                            label=label, capsize=3)
+                            label=label, capsize=5, linewidth=2.5, markersize=8)
                 if "BC" in models and not added_bayes:
                     y_bc = np.array(y_bc)[sort_ids]
                     y_err_bc = np.array(y_err_bc)[sort_ids] 
-                    ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", label="Bayes Classifier", capsize=3)
+                    ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", label="Bayes Classifier", 
+                    capsize=5, linewidth=2.5, markersize=8)
             else:
                 ax.plot(x, y, marker="o",  color=color, linestyle=linestyle, 
                         label=label)
@@ -719,10 +767,302 @@ class ExperimentManager:
         
         ax.xaxis.get_major_formatter()._usetex = False
         ax.yaxis.get_major_formatter()._usetex = False
-        ax.set_ylabel(ylabel)
         if title is None:
             title=name
-        ax.set_title(title)
+        if yspacing == "log":
+            ax.set_yscale('log')
+        if spacing == "log":
+            ax.set_xscale('log')
+            xticks = np.sort(K_l.append([0.2, 10]))
+            ax.set_xticks(xticks, minor=True)
+        elif spacing == "even":
+            ax.xaxis.set_ticks(x, minor=False)
+            xticks = [f"{K}" for K in K_l]
+            ax.xaxis.set_ticklabels(xticks, fontsize=15, fontweight="bold")
+            ax.set_xlim(left=-0.3)
+        else:
+            ax.set_xticks(K_l, minor=False)
+            ax.set_xlim(left=0.)
+        ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
+        ax.set_ylabel(ylabel, fontsize=20)
+        ax.set_xlabel("K", fontsize=17, fontweight="bold")
+        ax.set_title(title, fontweight=fontweight, fontsize=titlefont)
+        #ax.set_yticklabels([f"{round(i, 2):.2f}" for i in ax.get_yticks()], fontsize=13)
+        ax.set_yticklabels([f"{round(i, 1):.1f}" for i in ax.get_yticks()], fontsize=15, fontweight="bold")
+        #ax.set_xticklabels(ax.get_xticks(), fontsize=13)
+        ax.yaxis.grid()
+        ax.xaxis.grid()
+        if legend_cols is None:
+            ax.legend(loc=legend_loc)
+        else:
+            box = ax.get_position()
+            #w = box.width * 0.8
+            #h = w / 1.618
+            #width = 1.618 * box.height
+            ax.set_position([box.x0, box.y0, box.width*width, box.height])
+            leg = ax.legend(loc=legend_loc, ncol=legend_cols, shadow=False,
+                            bbox_to_anchor=(1, -0.23), frameon=False, markerscale=1,
+                            prop=dict(size=12.3, weight="bold"))
+            #leg.get_lines()[0].set_linestyle
+            #for i in leg.legendHandles:
+            #    i.set_linestyle(":")
+            #ax.set_aspect(1.618)
+        fig.set_tight_layout(True)
+        plt.show()
+
+    def plot_workshop(self, name: str, attack: str, models: List[str], 
+             errorbars: bool=True, ylabel: str=None, title: str=None,
+             spacing: str="normal", legend_loc="best", legend_cols: int=None,
+             budget: str=None, yspacing: str="normal", width=0.86, ratio=1.618,
+             titlefont=20, fontweight="bold", tickfont=17, xylabelfont=20,
+             legendfont=17, outside_legend=False, linewidth=2.5, markersize=8,
+             ylim = None, bbox_to_anchor=(1.005, 1.011), handlelength=1.35,
+             labelspacing = 0.1, borderpad=0.2,
+             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
+        """Plot relative or absolute over-robustness measure.
+
+        Args:
+            name (str): What measurement to plot:
+                - over-robustness
+                - relative-over-robustness
+                - f_wrt_y (allows for BC model)
+                - adversarial-robustness
+                - relative-adversarial-robustness
+                - validation-accuracy
+                - test-accuracy
+                - f1-robustness
+                - f1-min-changes
+            attack (str): 
+            models (List[str]): White-list
+            errorbars (bool): True or False
+            ylabel: Label of y-axis. If not provided it is set to "name".
+            title: Title of plot. If not provided it is set to "name".
+            K_l:List[float]=[0.1, 0.5, 1, 1.5, 2, 5]. White-list
+        """
+        h, w = matplotlib.figure.figaspect(ratio / width)
+        fig, ax = plt.subplots(figsize=(w,h))
+        #color_list = ['r', 
+        #              'tab:green', 
+        #              'b', 
+        #              'lime', 
+        #              'slategrey', 
+        #              'k', 
+        #              "lightsteelblue",
+        #              "antiquewhite",
+        #              ]
+        #linestyle_list = ['-', '--', ':', '-.']
+        #ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
+        #                  cycler('color', color_list))
+        added_bayes = False
+        for label, exp_by_k in self.model_iterator(attack, models):
+            x = []
+            y = []
+            y_err = []
+            y_bc = []
+            y_err_bc = []
+            for K, exp in exp_by_k.items():
+                if K not in K_l:
+                    continue
+                x.append(K)
+                value, std = exp.get_measurement(name, budget)
+                y.append(value)
+                y_err.append(std)
+                if "BC" in models and not added_bayes:
+                    if name == "f_wrt_y":
+                        value, std = exp.get_measurement("g_wrt_y", budget)
+                    elif name == "test-accuracy":
+                        value, std = exp.get_measurement("test-accuracy-bayes")
+                    else:
+                        raise ValueError("BC requested but name not f_wrt_y")
+                    y_bc.append(value)
+                    y_err_bc.append(std)
+            sort_ids = np.argsort(x)
+            if spacing == "even":
+                x = [i for i in range(len(K_l))]
+            else:
+                x = K_l
+            y = np.array(y)[sort_ids]
+            color, linestyle = self.get_style(label)
+            if label == "GraphSAGE":
+                label = "GraphSAGE"
+            if label == "GraphSAGE+LP":
+                label = "GraphSAGE+LP"
+            if errorbars:
+                y_err = np.array(y_err)[sort_ids]
+                ax.errorbar(x, y, yerr=y_err, marker="o", color=color, linestyle=linestyle,
+                            label=label, capsize=5, linewidth=linewidth, markersize=markersize)
+                if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
+                    y_err_bc = np.array(y_err_bc)[sort_ids] 
+                    ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", 
+                                label="Bayes Classifier", color="tab:olive",
+                                capsize=5, linewidth=3, markersize=9)
+            else:
+                ax.plot(x, y, marker="o",  color=color, linestyle=linestyle, 
+                        label=label)
+                if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
+                    ax.plot(x, y_bc, "s:", label="Bayes Classifier")
+            added_bayes = True
+        if ylabel is None:
+            ylabel=name
+        
+        ax.xaxis.get_major_formatter()._usetex = False
+        ax.yaxis.get_major_formatter()._usetex = False
+        if title is None:
+            title=name
+        if yspacing == "log":
+            ax.set_yscale('log')
+        if spacing == "log":
+            ax.set_xscale('log')
+            xticks = np.sort(K_l.append([0.2, 10]))
+            ax.set_xticks(xticks, minor=True)
+        elif spacing == "even":
+            ax.xaxis.set_ticks(x, minor=False)
+            xticks = [f"{K}" for K in K_l]
+            ax.xaxis.set_ticklabels(xticks, fontsize=tickfont)
+            ax.set_xlim(left=-0.3)
+            if ylim is not None:
+                ax.set_ylim(top=ylim)
+        else:
+            ax.set_xticks(K_l, minor=False)
+            ax.set_xlim(left=0.)
+        ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
+        ax.set_ylabel(ylabel, fontsize=xylabelfont)
+        ax.set_xlabel("K", fontsize=xylabelfont)
+        ax.set_title(title, fontweight=fontweight, fontsize=titlefont)
+        ax.set_yticklabels([f"{round(i, 2):.2f}" for i in ax.get_yticks()], fontsize=tickfont)
+        #ax.set_yticklabels([f"{round(i, 1):.1f}" for i in ax.get_yticks()], fontsize=tickfont)
+        #ax.set_xticklabels(ax.get_xticks(), fontsize=13)
+        ax.yaxis.grid()
+        ax.xaxis.grid()
+        if legend_cols is None:
+            ax.legend(loc=legend_loc)
+        #Titlepicture:
+        #ax.legend(prop=dict(size=legendfont, weight="bold"), loc=legend_loc, 
+        #          bbox_to_anchor=(1.018, 1.04), frameon=True,
+        #          labelspacing=0.12, handleheight=0.5)
+        if outside_legend:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width*width, box.height])
+            leg = ax.legend(loc=legend_loc, ncol=legend_cols, shadow=False,
+                            bbox_to_anchor=(1, 1), frameon=False, markerscale=1,
+                            prop=dict(size=legendfont))
+        else:
+            #ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+            #        bbox_to_anchor=(0.5, 1.028), frameon=True,
+            #        labelspacing=0.1, handleheight=0.3, ncol=legend_cols,
+            #        handlelength=1, columnspacing=0.2)
+            #Titlepicture:
+            #ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+            #        bbox_to_anchor=bbox_to_anchor, frameon=True,
+            #        labelspacing=0.1, ncol=legend_cols, handletextpad=0.4,
+            #        handlelength=1.35, columnspacing=0.2, borderaxespad=0.2,
+            #        borderpad=0.2)
+            ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+                    bbox_to_anchor=bbox_to_anchor, frameon=True,
+                    labelspacing=labelspacing, ncol=legend_cols, handletextpad=0.4,
+                    handlelength=handlelength, columnspacing=0.2, borderaxespad=0.2,
+                    borderpad=borderpad)
+        fig.set_tight_layout(True)
+        plt.show()
+
+    def plot_normal(self, name: str, attack: str, models: List[str], 
+             errorbars: bool=True, ylabel: str=None, title: str=None,
+             spacing: str="normal", legend_loc="best", legend_cols: int=None,
+             budget: str=None, yspacing: str="normal", width=0.86, ratio=1.618,
+             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
+        """Plot relative or absolute over-robustness measure.
+
+        Args:
+            name (str): What measurement to plot:
+                - over-robustness
+                - relative-over-robustness
+                - f_wrt_y (allows for BC model)
+                - adversarial-robustness
+                - relative-adversarial-robustness
+                - validation-accuracy
+                - test-accuracy
+                - f1-robustness
+                - f1-min-changes
+            attack (str): 
+            models (List[str]): White-list
+            errorbars (bool): True or False
+            ylabel: Label of y-axis. If not provided it is set to "name".
+            title: Title of plot. If not provided it is set to "name".
+            K_l:List[float]=[0.1, 0.5, 1, 1.5, 2, 5]. White-list
+        """
+        h, w = matplotlib.figure.figaspect(ratio / width)
+        fig, ax = plt.subplots(figsize=(w,h))
+        #color_list = ['r', 
+        #              'tab:green', 
+        #              'b', 
+        #              'lime', 
+        #              'slategrey', 
+        #              'k', 
+        #              "lightsteelblue",
+        #              "antiquewhite",
+        #              ]
+        #linestyle_list = ['-', '--', ':', '-.']
+        #ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
+        #                  cycler('color', color_list))
+        added_bayes = False
+        for label, exp_by_k in self.model_iterator(attack, models):
+            x = []
+            y = []
+            y_err = []
+            y_bc = []
+            y_err_bc = []
+            for K, exp in exp_by_k.items():
+                if K not in K_l:
+                    continue
+                x.append(K)
+                value, std = exp.get_measurement(name, budget)
+                y.append(value)
+                y_err.append(std)
+                if "BC" in models and not added_bayes:
+                    if name == "f_wrt_y":
+                        value, std = exp.get_measurement("g_wrt_y", budget)
+                    elif name == "test-accuracy":
+                        value, std = exp.get_measurement("test-accuracy-bayes")
+                    else:
+                        raise ValueError("BC requested but name not f_wrt_y")
+                    y_bc.append(value)
+                    y_err_bc.append(std)
+            sort_ids = np.argsort(x)
+            if spacing == "even":
+                x = [i for i in range(len(K_l))]
+            else:
+                x = K_l
+            y = np.array(y)[sort_ids]
+            color, linestyle = self.get_style(label)
+            if label == "GraphSAGE":
+                label = "GraphSAGE"
+            if label == "GraphSAGE+LP":
+                label = "GraphSAGE+LP"
+            if errorbars:
+                y_err = np.array(y_err)[sort_ids]
+                ax.errorbar(x, y, yerr=y_err, marker="o", color=color, linestyle=linestyle,
+                            label=label, capsize=3)
+                if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
+                    y_err_bc = np.array(y_err_bc)[sort_ids] 
+                    ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", label="Bayes Classifier", 
+                    capsize=3, color="tab:olive")
+            else:
+                ax.plot(x, y, marker="o",  color=color, linestyle=linestyle, 
+                        label=label)
+                if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
+                    ax.plot(x, y_bc, "s:", label="Bayes Classifier")
+            added_bayes = True
+        if ylabel is None:
+            ylabel=name
+        
+        ax.xaxis.get_major_formatter()._usetex = False
+        ax.yaxis.get_major_formatter()._usetex = False
+        if title is None:
+            title=name
         if yspacing == "log":
             ax.set_yscale('log')
         if spacing == "log":
@@ -738,15 +1078,27 @@ class ExperimentManager:
             ax.set_xticks(K_l, minor=False)
             ax.set_xlim(left=0.)
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
-        ax.set_xlabel(r"K")
+        ax.set_ylabel(ylabel)
+        ax.set_xlabel("K")
+        ax.set_title(title, fontweight="bold", fontsize=15)
+        #ax.set_yticklabels([f"{round(i, 2):.2f}" for i in ax.get_yticks()], fontsize=13)
+        ax.set_yticklabels([f"{round(i, 1):.1f}" for i in ax.get_yticks()],)
+        #ax.set_xticklabels(ax.get_xticks(), fontsize=13)
         ax.yaxis.grid()
+        ax.xaxis.grid()
         if legend_cols is None:
             ax.legend(loc=legend_loc)
         else:
             box = ax.get_position()
-            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            #w = box.width * 0.8
+            #h = w / 1.618
+            #width = 1.618 * box.height
+            ax.set_position([box.x0, box.y0, box.width*width, box.height])
             ax.legend(loc=legend_loc, ncol=legend_cols, shadow=False,
-                      bbox_to_anchor=(1, 0), frameon=False)
+                      bbox_to_anchor=(1, -0.05), frameon=False,
+                      prop=dict(size=10, weight="bold"))
+            #ax.set_aspect(1.618)
+        fig.set_tight_layout(True)
         plt.show()
 
     def plot_wrt_degree(self, name: str, attack: str, models: List[str], 
@@ -773,14 +1125,14 @@ class ExperimentManager:
                 max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
                 if max_deg_ > max_degree:
                     max_degree = max_deg_
-        
-        fig, axs = plt.subplots()
-        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        h, w = matplotlib.figure.figaspect(1.618 / 1)
+        fig, axs = plt.subplots(figsize=(w,h))
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "wheat", "tab:olive"]
         linestyle_list = ['-', '--', ':', '-.']
         axs.set_prop_cycle(cycler('linestyle', linestyle_list)*
                            cycler('color', color_list))
         bayes_added = False
-        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+        for label, K, exp in self.experiment_iterator(attack, models, K):  
             avg_f_wrt_y = exp.robustness_statistics["avg_avg_gnn_robust_when_both"]
             std_f_wrt_y = exp.robustness_statistics["std_avg_gnn_robust_when_both"]
             avg_g_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
@@ -801,8 +1153,12 @@ class ExperimentManager:
                     axs.errorbar(x, ordered_avg_f_wrt_y, 
                                 yerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3)
                 if not bayes_added:
-                    axs.errorbar(x, ordered_avg_g_wrt_y, 
-                                yerr=ordered_std_g_wrt_y, fmt="s:", label=f"Bayes", capsize=3)
+                    if K == 5.0:
+                        avg_g_store = ordered_avg_g_wrt_y
+                        std_g_store = ordered_std_g_wrt_y
+                    else:
+                        axs.errorbar(x, ordered_avg_g_wrt_y, 
+                                    yerr=ordered_std_g_wrt_y, fmt="s:", label=f"K={K}", capsize=3)
                 if name == "f_wrt_g" or name == "both":
                     axs.errorbar(x, ordered_avg_f_wrt_g, 
                                 yerr=ordered_std_f_wrt_g, marker="o", label=f"{label} w.r.t. Bayes", capsize=3)
@@ -813,15 +1169,17 @@ class ExperimentManager:
                     axs.plot(x, ordered_avg_g_wrt_y, 's:', label="Bayes")
                 if name == "f_wrt_g" or name == "both":
                     axs.plot(x, ordered_avg_f_wrt_g, marker='o', label=f"{label} w.r.t. Bayes")
-            bayes_added = True
+            bayes_added = False
+        axs.errorbar(x, avg_g_store, 
+                    yerr=std_g_store, fmt="s:", label=f"K={5.0}", capsize=3)
         if ylabel is None:
             ylabel=name
-        axs.set_ylabel(ylabel)
-        axs.set_xlabel("Degree")
+        axs.set_ylabel(ylabel, fontsize=12)
+        axs.set_xlabel("Node degree", fontsize=12)
         if title is None:
             title=name
-        axs.set_title(title)
-        axs.legend()
+        axs.set_title(r"\textbf{Average robustness of the Bayes classifier}", fontsize=13)
+        axs.legend(loc="upper left", ncol=2, bbox_to_anchor=(-0.01, 1.02))
         start_x, end_x = axs.get_xlim()
         start_y, end_y = axs.get_ylim()
         axs.xaxis.set_ticks(np.arange(0, end_x, step=1))
@@ -896,7 +1254,8 @@ class ExperimentManager:
         plt.show()
 
     def boxplot_wrt_degree_raw(self, name: str, attack: str, models: List[str], K: List[float],
-                        errorbars: bool=True, ylabel: str=None, title: str=None):
+                        errorbars: bool=True, ylabel: str=None, title: str=None,
+                        toplim=12):
         """Generate w.r.t. degree boxplots.
 
         Args:
@@ -911,14 +1270,13 @@ class ExperimentManager:
             ylabel (str, optional): _description_. Defaults to None.
             title (str, optional): _description_. Defaults to None.
         """
+        fig, axs = plt.subplots()
         max_deg = 0
         for label, K, exp in self.experiment_iterator(attack, models, [K]):  
             avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
             max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
             if max_deg_ > max_deg:
                 max_deg = max_deg_
-        
-        fig, axs = plt.subplots()
         color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
         linestyle_list = ['-', '--', ':', '-.']
         axs.set_prop_cycle(cycler('linestyle', linestyle_list)*
@@ -930,20 +1288,28 @@ class ExperimentManager:
             f_wrt_g = exp.robustness_statistics["c_gnn_wrt_bayes_robust"]
             
             x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            x = x[x <= 8]
             ordered_f_wrt_y = [f_wrt_y[str(i)] for i in x]
+            for f_wrt_y_l in ordered_f_wrt_y:
+                for i in range(len(f_wrt_y_l)):
+                    if f_wrt_y_l[i] > toplim: 
+                        f_wrt_y_l[i]=toplim
             ordered_g_wrt_y = [g_wrt_y[str(i)] for i in x]
             ordered_f_wrt_g = [f_wrt_g[str(i)] for i in x]
             if errorbars:
                 if name == "f_wrt_y" or name == "both":
-                    axs.boxplot(ordered_f_wrt_y, showfliers=True)
+                    axs.boxplot(ordered_f_wrt_y, positions=x,showfliers=True,
+                                notch=False, 
+                                flierprops={'markersize':5}, 
+                                medianprops={'linewidth':3, "solid_capstyle": "butt"})
                     #axs.violinplot(ordered_f_wrt_y)
                     pass
-                if not bayes_added:
+                if name == "g_wrt_y":
                     #print(len(ordered_g_wrt_y))
-                    #axs.boxplot(ordered_g_wrt_y, showfliers=True)
-                                #whiskerprops={'color' : 'tab:blue'}, 
-                                #patch_artist=True,
-                    #            showfliers=True)
+                    axs.boxplot(ordered_g_wrt_y, positions=x,showfliers=True,
+                                notch=False, 
+                                flierprops={'markersize':5}, 
+                                medianprops={'linewidth':3, "solid_capstyle": "butt"})
                     pass
             else:
                 pass
@@ -951,19 +1317,25 @@ class ExperimentManager:
         if ylabel is None:
             ylabel=name
         axs.set_ylabel(ylabel)
-        axs.set_xlabel("Degree")
-        axs.set_xlim(left=0)
-        axs.set_xticks(range(1, len(ordered_f_wrt_y)+1), x)
+        axs.set_xlabel("Node degree", fontsize=15)
+        axs.set_xlim(left=-0.5)
+        axs.set_ylim(top=toplim)
+        print(x)
+        axs.set_xticks(range(0, len(ordered_f_wrt_y)), x)
+        axs.set_yticks(range(0, toplim+1, 5))
+        axs.set_xticklabels(axs.get_xticks(), fontsize=13)
+        axs.set_xticklabels(axs.get_xticks(), fontsize=13)
+        axs.yaxis.grid()
         if title is None:
             title=name
-        axs.set_title(title)
-        plt.grid()
+        axs.set_title(title, fontweight="bold", fontsize=15)
         plt.show()
 
     def plot_f1(self, name: str, attack_overrobustness: str, attack_advrobustness: str,
                 models: List[str], errorbars: bool=True, spacing: str="normal",
                 label: str=None, title: str=None, ylabel: str=None, budget=None,
-                legend_loc="best", 
+                legend_loc="best", titlefont=20, tickfont=17, xylabelfont=20,
+                legendfont=17, outside_legend=False, width=0.86,
                 K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
         """Plot f1 scores to trade of between over- and adv. robustness.
 
@@ -979,7 +1351,8 @@ class ExperimentManager:
             title (str, optional): _description_. Defaults to None.
             K_l (List[float], optional): _description_. Defaults to [0.1, 0.5, 1, 1.5, 2, 5].
         """
-        fig, ax = plt.subplots()
+        h, w = matplotlib.figure.figaspect(1.618 / width)
+        fig, ax = plt.subplots(figsize=(w,h))
         color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
         linestyle_list = ['-', '--', ':', '-.']
         ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
@@ -1036,8 +1409,9 @@ class ExperimentManager:
                 yerr.append(scipy.stats.sem(f1_score))
             color, linestyle = self.get_style(label)
             if errorbars:
-                ax.errorbar(x, y, yerr=yerr, marker="o", label=label, capsize=3,
-                            color=color, linestyle=linestyle)
+                ax.errorbar(x, y, yerr=yerr, marker="o", label=label, capsize=5,
+                            color=color, linestyle=linestyle, linewidth=2.5,
+                            markersize=8)
             else:
                 ax.plot(x, y, marker="o", label=label, color=color, 
                         linestyle=linestyle)
@@ -1045,10 +1419,13 @@ class ExperimentManager:
             ylabel=name 
         ax.xaxis.get_major_formatter()._usetex = False
         ax.yaxis.get_major_formatter()._usetex = False
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel("", fontsize=xylabelfont)
+        ax.set_xlabel("K", fontsize=xylabelfont)
+        ax.set_title(title, fontsize=titlefont)
+        ax.set_yticklabels([f"{round(i, 2):.2f}" for i in ax.get_yticks()], fontsize=tickfont)
+        ax.set_xticklabels(ax.get_xticks(), fontsize=tickfont)
         if title is None:
             title=name
-        ax.set_title(title)
         if spacing == "log":
             ax.set_xscale('log')
             xticks = np.sort(K_l + [0.2, 10])
@@ -1062,12 +1439,18 @@ class ExperimentManager:
             ax.set_xticks(K_l, minor=False)
             ax.set_xlim(left=0.)
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
-        ax.set_xlabel("K")
         ax.yaxis.grid()
+        ax.xaxis.grid()
         box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc=legend_loc, ncol=1, shadow=False,
-                    bbox_to_anchor=(1, 0), frameon=False)
+        ax.set_position([box.x0, box.y0, box.width*0.86, box.height])
+        leg = ax.legend(loc=legend_loc, ncol=1, shadow=False,
+                        bbox_to_anchor=(1, 1), frameon=False, markerscale=1,
+                        prop=dict(size=legendfont))
+        #leg.get_lines()[0].set_linestyle
+        #for i in leg.legendHandles:
+        #    i.set_linestyle(":")
+        #ax.set_aspect(1.618)
+        fig.set_tight_layout(True)
         plt.show()
 
     def starplot(self, name: str, attack: str, models: List[str], 
@@ -1095,7 +1478,8 @@ class ExperimentManager:
                 max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
                 if max_deg_ > max_degree:
                     max_degree = max_deg_
-        
+        #h, w = matplotlib.figure.figaspect(1.618 / 1.15)
+        #fig, axs = plt.subplots(figsize=(w,h))
         fig, axs = plt.subplots()
         color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
         linestyle_list = ['-', '--', ':', '-.']
@@ -1118,13 +1502,16 @@ class ExperimentManager:
             ordered_std_g_wrt_y = [std_g_wrt_y[str(i)] for i in x]
             ordered_avg_f_wrt_g = [avg_f_wrt_g[str(i)] for i in x]
             ordered_std_f_wrt_g = [std_f_wrt_g[str(i)] for i in x]
+            color, linestyle = self.get_style(label)
             if errorbars:
-                if name == "f_wrt_y" or name == "both":
-                    axs.errorbar(ordered_avg_f_wrt_y, x,  
-                                xerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3)
                 if not bayes_added:
-                    axs.errorbar(ordered_avg_g_wrt_y, x, 
-                                xerr=ordered_std_g_wrt_y, fmt="s:", label=f"{bayes_label}", capsize=3)
+                    axs.errorbar(x, ordered_avg_g_wrt_y, 
+                                yerr=ordered_std_g_wrt_y, fmt="s:", label=f"{bayes_label}", capsize=3,
+                                color="tab:olive")
+                if name == "f_wrt_y" or name == "both":
+                    axs.errorbar(x, ordered_avg_f_wrt_y,  
+                                yerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3,
+                                color=color, linestyle=linestyle)
                 if name == "f_wrt_g" or name == "both":
                     axs.errorbar(ordered_avg_f_wrt_g, x, 
                                 yerr=ordered_std_f_wrt_g, marker="o", label=f"{label} w.r.t. Bayes", capsize=3)
@@ -1138,19 +1525,186 @@ class ExperimentManager:
             bayes_added = True
         if ylabel is None:
             ylabel=name
-        axs.set_xlabel(ylabel)
-        axs.set_ylabel("Degree")
+        axs.set_ylabel(ylabel, fontsize=13)
+        axs.set_xlabel("Node Degree", fontsize=13)
         if logplot:
-            axs.set_xscale('log')
+            axs.set_yscale('log')
         if title is None:
             title=name
-        axs.set_title(title)
-        axs.legend()
+        axs.set_title(title, fontweight="bold", fontsize=15)
         start_x, end_x = axs.get_xlim()
         start_y, end_y = axs.get_ylim()
+        # filling:
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            avg_g_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+            x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            x = x[x <= max_degree]
+            ordered_avg_g_wrt_y = [avg_g_wrt_y[str(i)] for i in x]
+            start_y, end_y = axs.get_ylim()
+            axs.fill_between(x, start_y, ordered_avg_g_wrt_y, interpolate=True, 
+                                color='tab:olive', alpha=0.1)
+            axs.fill_between(x, ordered_avg_g_wrt_y, end_y, 
+                                interpolate=True, color='red', alpha=0.1)
+            break
+
         #axs.xaxis.set_ticks(np.arange(0, end_x, step=1))
-        #axs.yaxis.set_ticks(np.arange(0, end_y, step=1))
-        plt.grid()
+        axs.yaxis.set_ticks([1, 10, 100], ["1", "10", "100"])
+        axs.set_xticklabels([int(i) for i in axs.get_xticks()], fontsize=10)
+        axs.set_yticklabels(axs.get_yticks(), fontsize=10)
+        #axs.xaxis.set_ticks_position('top')
+        #axs.xaxis.set_label_position('top')
+        box = axs.get_position()
+        axs.set_position([box.x0, box.y0, box.width * 0.8, box.height * 0.9])
+        axs.legend(loc="center left", ncol=1, shadow=False,
+                    bbox_to_anchor=(1, 0.5), frameon=False, fontsize=12)
+        axs.invert_yaxis()
+        bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0)
+        t = axs.text(
+            4, 2, "Preserved\nSemantics", 
+            rotation=0, size=14, color="tab:olive", fontstyle="oblique",
+            fontweight="bold",
+            bbox=bbox_props)
+        t = axs.text(
+            3, 38, "Changed\nSemantics", 
+            rotation=0, size=14, color="r", fontstyle="oblique",
+            fontweight="bold",
+            bbox=bbox_props)
+        #plt.grid(axis="both")
+        plt.show()
+
+    def starplot_workshop(self, name: str, attack: str, models: List[str], 
+                 K: List[float], max_degree: int=None, logplot: bool=False,
+                 errorbars: bool=True, ylabel: str=None, title: str=None,
+                 bayes_label="Bayes", xyfontsize=13, ticksize=10, legendsize=12,
+                 ratio=1.618, weight=1.5, titlefont=15, invert_axis=True,
+                 linewidth=1, markersize=5):
+        
+        """Generate starplot (w.r.t. degree plots).
+
+        Args:
+            name (str):
+                - f_wrt_y
+                - f_wrt_g
+                - both
+            attack (str): _description_
+            models (List[str]): _description_
+            K (List[float]): _description_
+            errorbars (bool, optional): _description_. Defaults to True.
+            ylabel (str, optional): _description_. Defaults to None.
+            title (str, optional): _description_. Defaults to None.
+        """
+        if max_degree is None:
+            max_degree = 0
+            for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+                avg_f_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+                max_deg_ = max([int(deg) for deg in avg_f_wrt_y.keys()])
+                if max_deg_ > max_degree:
+                    max_degree = max_deg_
+        #h, w = matplotlib.figure.figaspect(ratio / weight)
+        #fig, axs = plt.subplots(figsize=(w,h))
+        fig, axs = plt.subplots()
+        color_list = ['r', 'tab:green', 'b', 'lime', 'c', 'k', "antiquewhite"]
+        linestyle_list = ['-', '--', ':', '-.']
+        axs.set_prop_cycle(cycler('linestyle', linestyle_list)*
+                           cycler('color', color_list))
+        bayes_added = False
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            avg_f_wrt_y = exp.robustness_statistics["avg_avg_gnn_robust_when_both"]
+            std_f_wrt_y = exp.robustness_statistics["sem_avg_gnn_robust_when_both"]
+            avg_g_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+            std_g_wrt_y = exp.robustness_statistics["sem_avg_bayes_robust_when_both"]
+            avg_f_wrt_g = exp.robustness_statistics["avg_avg_gnn_wrt_bayes_robust"]
+            std_f_wrt_g = exp.robustness_statistics["sem_avg_gnn_wrt_bayes_robust"]
+            
+            x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            x = x[x <= max_degree]
+            ordered_avg_f_wrt_y = [avg_f_wrt_y[str(i)] for i in x]
+            ordered_std_f_wrt_y = [std_f_wrt_y[str(i)] for i in x]
+            ordered_avg_g_wrt_y = [avg_g_wrt_y[str(i)] for i in x]
+            ordered_std_g_wrt_y = [std_g_wrt_y[str(i)] for i in x]
+            ordered_avg_f_wrt_g = [avg_f_wrt_g[str(i)] for i in x]
+            ordered_std_f_wrt_g = [std_f_wrt_g[str(i)] for i in x]
+            color, linestyle = self.get_style(label)
+            if errorbars:
+                if not bayes_added:
+                    axs.errorbar(x, ordered_avg_g_wrt_y, 
+                                yerr=ordered_std_g_wrt_y, fmt="s:", label=f"{bayes_label}", capsize=3,
+                                color="tab:olive", linewidth=linewidth, markersize=markersize)
+                if name == "f_wrt_y" or name == "both":
+                    axs.errorbar(x, ordered_avg_f_wrt_y,  
+                                yerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3,
+                                color=color, linestyle=linestyle, linewidth=linewidth, markersize=markersize)
+                if name == "f_wrt_g" or name == "both":
+                    axs.errorbar(ordered_avg_f_wrt_g, x, 
+                                yerr=ordered_std_f_wrt_g, marker="o", label=f"{label} w.r.t. Bayes", capsize=3)
+            else:
+                if name == "f_wrt_y" or name == "both":
+                    axs.plot(ordered_avg_f_wrt_y, x, marker='o', label=f"{label}")
+                if not bayes_added:
+                    axs.plot(ordered_avg_g_wrt_y, x, 's:', label=bayes_label)
+                if name == "f_wrt_g" or name == "both":
+                    axs.plot(ordered_avg_f_wrt_g, x, marker='o', label=f"{label} w.r.t. Bayes")
+            bayes_added = True
+        if ylabel is None:
+            ylabel=name
+        axs.set_ylabel(ylabel, fontsize=xyfontsize)
+        axs.set_xlabel("Node degree", fontsize=xyfontsize)
+        if logplot:
+            axs.set_yscale('log')
+        if title is None:
+            title=name
+        axs.set_title(title, fontweight="bold", fontsize=titlefont)
+        start_x, end_x = axs.get_xlim()
+        start_y, end_y = axs.get_ylim()
+        # filling:
+        for label, K, exp in self.experiment_iterator(attack, models, [K]):  
+            avg_g_wrt_y = exp.robustness_statistics["avg_avg_bayes_robust_when_both"]
+            x = np.sort([int(i) for i in avg_f_wrt_y.keys()])
+            x = x[x <= max_degree]
+            ordered_avg_g_wrt_y = [avg_g_wrt_y[str(i)] for i in x]
+            start_y, end_y = axs.get_ylim()
+            axs.fill_between(x, start_y, ordered_avg_g_wrt_y, interpolate=True, 
+                                color='tab:olive', alpha=0.1)
+            axs.fill_between(x, ordered_avg_g_wrt_y, end_y, 
+                                interpolate=True, color='red', alpha=0.1)
+            break
+
+        #axs.xaxis.set_ticks(np.arange(0, end_x, step=1))
+        axs.yaxis.set_ticks([1, 10, 100], ["1", "10", "100"])
+        axs.set_xticklabels([int(i) for i in axs.get_xticks()], fontsize=ticksize)
+        axs.set_yticklabels(axs.get_yticks(), fontsize=ticksize)
+        #axs.xaxis.set_ticks_position('top')
+        #axs.xaxis.set_label_position('top')
+        box = axs.get_position()
+        axs.set_position([box.x0, box.y0, box.width * 0.8, box.height * 0.7])
+        axs.legend(loc="center left", ncol=1, shadow=False,
+                    bbox_to_anchor=(1, 0.5), frameon=False, fontsize=legendsize)
+        if invert_axis:
+            axs.invert_yaxis()
+            bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0)
+            t = axs.text(
+                4.2, 1.4, r"\begin{center}\textbf{\textit{Preserved}}\\\textbf{\textit{semantics}}\end{center}", 
+                rotation=0, size=15, color="tab:olive", fontstyle="oblique",
+                fontweight="bold",
+                bbox=bbox_props)
+            t = axs.text(
+                3, 24, r"\begin{center}\textbf{\textit{Changed}}\\\textbf{\textit{semantics}}\end{center}", 
+                rotation=0, size=15, color="r", fontstyle="oblique",
+                fontweight="bold",
+                bbox=bbox_props)
+        else:
+            bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0)
+            t = axs.text(
+                4, 1.6, r"\begin{center}\textbf{Preserved}\\\textbf{semantics}\end{center}", 
+                rotation=0, size=15, color="tab:olive", fontstyle="oblique",
+                fontweight="bold",
+                bbox=bbox_props)
+            t = axs.text(
+                3, 32, r"\begin{center}\textbf{Changed}\\\textbf{semantics}\end{center}", 
+                rotation=0, size=15, color="r", fontstyle="oblique",
+                fontweight="bold",
+                bbox=bbox_props)
+        #plt.grid(axis="both")
         plt.show()
 
     def model_iterator(
