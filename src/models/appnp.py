@@ -13,7 +13,7 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.typing import Adj, OptTensor
 
-from strn_and_rbstness.models.utils import process_input
+from src.models.utils import process_input
 
 
 class APPNP(MessagePassing):

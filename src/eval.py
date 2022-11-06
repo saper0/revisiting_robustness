@@ -282,7 +282,6 @@ def evaluate_robustness(model: Optional[nn.Module],
         med_gnn_wrt_bayes_robust[f"{degree}"] = float(np.median(c_gnn_wrt_bayes_robust[degree]))
         std_gnn_wrt_bayes_robust[f"{degree}"] = float(np.std(c_gnn_wrt_bayes_robust[degree]))
         sem_gnn_wrt_bayes_robust[f"{degree}"] = float(scipy.stats.sem(c_gnn_wrt_bayes_robust[degree], ddof=0))
-        print(c_gnn_wrt_bayes_robust)
         max_gnn_wrt_bayes_robust[f"{degree}"] = float(np.max(c_gnn_wrt_bayes_robust[degree]))
     avg_bayes_robust_when_both = {}
     med_bayes_robust_when_both = {}

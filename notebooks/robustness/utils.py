@@ -817,7 +817,7 @@ class ExperimentManager:
              titlefont=20, fontweight="bold", tickfont=17, xylabelfont=20,
              legendfont=17, outside_legend=False, linewidth=2.5, markersize=8,
              ylim = None, bbox_to_anchor=(1.005, 1.011), handlelength=1.35,
-             labelspacing = 0.1, borderpad=0.2,
+             labelspacing = 0.1, borderpad=0.2, tickfontweight="bold",
              K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
         """Plot relative or absolute over-robustness measure.
 
@@ -887,6 +887,8 @@ class ExperimentManager:
                 label = "GraphSAGE"
             if label == "GraphSAGE+LP":
                 label = "GraphSAGE+LP"
+            if fontweight == "bold":
+                label = f"\\textbf{{{label}}}"
             if errorbars:
                 y_err = np.array(y_err)[sort_ids]
                 ax.errorbar(x, y, yerr=y_err, marker="o", color=color, linestyle=linestyle,
@@ -907,8 +909,8 @@ class ExperimentManager:
         if ylabel is None:
             ylabel=name
         
-        ax.xaxis.get_major_formatter()._usetex = False
-        ax.yaxis.get_major_formatter()._usetex = False
+        ax.xaxis.get_major_formatter()._usetex = True
+        ax.yaxis.get_major_formatter()._usetex = True
         if title is None:
             title=name
         if yspacing == "log":
@@ -919,7 +921,10 @@ class ExperimentManager:
             ax.set_xticks(xticks, minor=True)
         elif spacing == "even":
             ax.xaxis.set_ticks(x, minor=False)
-            xticks = [f"{K}" for K in K_l]
+            if tickfontweight=="bold":
+                xticks = [f"\\textbf{{{K}}}" for K in K_l]
+            else:
+                xticks = [f"{K}" for K in K_l]
             ax.xaxis.set_ticklabels(xticks, fontsize=tickfont)
             ax.set_xlim(left=-0.3)
             if ylim is not None:
@@ -929,9 +934,15 @@ class ExperimentManager:
             ax.set_xlim(left=0.)
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
         ax.set_ylabel(ylabel, fontsize=xylabelfont)
-        ax.set_xlabel("K", fontsize=xylabelfont)
+        xlabel = "K"
+        if fontweight == "bold":
+            xlabel = f"\\textbf{{{xlabel}}}"
+        ax.set_xlabel(xlabel, fontsize=xylabelfont)
         ax.set_title(title, fontweight=fontweight, fontsize=titlefont)
-        ax.set_yticklabels([f"{round(i, 2):.2f}" for i in ax.get_yticks()], fontsize=tickfont)
+        if tickfontweight=="bold":
+            ax.set_yticklabels([f"\\textbf{{{round(i, 2):.1f}}}" for i in ax.get_yticks()], fontsize=tickfont)
+        else:
+            ax.set_yticklabels([f"{round(i, 2):.1f}" for i in ax.get_yticks()], fontsize=tickfont)
         #ax.set_yticklabels([f"{round(i, 1):.1f}" for i in ax.get_yticks()], fontsize=tickfont)
         #ax.set_xticklabels(ax.get_xticks(), fontsize=13)
         ax.yaxis.grid()
@@ -1628,11 +1639,11 @@ class ExperimentManager:
             if errorbars:
                 if not bayes_added:
                     axs.errorbar(x, ordered_avg_g_wrt_y, 
-                                yerr=ordered_std_g_wrt_y, fmt="s:", label=f"{bayes_label}", capsize=3,
+                                yerr=ordered_std_g_wrt_y, fmt="s:", label=bayes_label, capsize=3,
                                 color="tab:olive", linewidth=linewidth, markersize=markersize)
                 if name == "f_wrt_y" or name == "both":
                     axs.errorbar(x, ordered_avg_f_wrt_y,  
-                                yerr=ordered_std_f_wrt_y, marker="o", label=f"{label}", capsize=3,
+                                yerr=ordered_std_f_wrt_y, marker="o", label=f"\\textbf{{{label}}}", capsize=3,
                                 color=color, linestyle=linestyle, linewidth=linewidth, markersize=markersize)
                 if name == "f_wrt_g" or name == "both":
                     axs.errorbar(ordered_avg_f_wrt_g, x, 
@@ -1647,8 +1658,8 @@ class ExperimentManager:
             bayes_added = True
         if ylabel is None:
             ylabel=name
-        axs.set_ylabel(ylabel, fontsize=xyfontsize)
-        axs.set_xlabel("Node degree", fontsize=xyfontsize)
+        axs.set_ylabel(ylabel, fontsize=xyfontsize, fontweight="bold")
+        axs.set_xlabel(r"\textbf{Node degree}", fontsize=xyfontsize, fontweight="bold")
         if logplot:
             axs.set_yscale('log')
         if title is None:
@@ -1671,7 +1682,8 @@ class ExperimentManager:
 
         #axs.xaxis.set_ticks(np.arange(0, end_x, step=1))
         axs.yaxis.set_ticks([1, 10, 100], ["1", "10", "100"])
-        axs.set_xticklabels([int(i) for i in axs.get_xticks()], fontsize=ticksize)
+        axs.set_xticklabels([int(i) for i in axs.get_xticks()], 
+                            fontsize=ticksize)
         axs.set_yticklabels(axs.get_yticks(), fontsize=ticksize)
         #axs.xaxis.set_ticks_position('top')
         #axs.xaxis.set_label_position('top')
@@ -1705,6 +1717,7 @@ class ExperimentManager:
                 fontweight="bold",
                 bbox=bbox_props)
         #plt.grid(axis="both")
+        fig.set_tight_layout(True)
         plt.show()
 
     def model_iterator(
