@@ -39,6 +39,7 @@ class OriginalNettack:
                  W: sp.csr_matrix,
                  u: int,
                  verbose=False,
+                 power_law_test=False,
                  **kwargs):
         """
 
@@ -49,8 +50,9 @@ class OriginalNettack:
             W (sp.csr_matrix): -
             u (int): -
             verbose (bool, optional): _description_. Defaults to False.
+            power_law_test (bool): Whether to perform a test on
+                preserving power-law distribution.
         """
-
         # Adjacency matrix
         self.adj = adj.copy().tolil()
         self.adj_no_selfloops = self.adj.copy()
@@ -70,6 +72,7 @@ class OriginalNettack:
         self.K = np.max(self.z_obs) + 1
         # Accumulated weight matrices
         self.W = W
+        self.power_law_test = power_law_test
 
         self.cooc_matrix = self.X_obs.T.dot(self.X_obs).tolil()
         self.cooc_constraint = None
@@ -396,6 +399,21 @@ class OriginalNettack:
                     n_influencers))
             logging.info("##### Performing {} perturbations #####".format(n_perturbations))
 
+        if perturb_structure and self.power_law_test:
+            # Setup starting values of the likelihood ratio test.
+            degree_sequence_start = self.adj_orig.sum(0).A1
+            current_degree_sequence = self.adj.sum(0).A1
+            d_min = 2
+            S_d_start = np.sum(
+                np.log(degree_sequence_start[degree_sequence_start >= d_min]))
+            current_S_d = np.sum(
+                np.log(current_degree_sequence[current_degree_sequence >= d_min]))
+            n_start = np.sum(degree_sequence_start >= d_min)
+            current_n = np.sum(current_degree_sequence >= d_min)
+            alpha_start = compute_alpha(n_start, S_d_start, d_min)
+            log_likelihood_orig = compute_log_likelihood(
+                n_start, alpha_start, S_d_start, d_min)
+
         if len(self.influencer_nodes) == 0:
             if not direct:
                 # Choose influencer nodes
@@ -430,8 +448,31 @@ class OriginalNettack:
                     self.potential_edges, self.adj)
                 filtered_edges = self.potential_edges[singleton_filter]
 
-                # Don't perform power-law degree test.
-                filtered_edges_final = filtered_edges
+                if self.power_law_test:
+                    # Update the values for the power law likelihood ratio test.
+                    deltas = 2 * \
+                        (1 - self.adj[tuple(filtered_edges.T)].toarray()[0]) - 1
+                    d_edges_old = current_degree_sequence[filtered_edges]
+                    d_edges_new = current_degree_sequence[filtered_edges] + \
+                        deltas[:, None]
+                    new_S_d, new_n = update_Sx(
+                        current_S_d, current_n, d_edges_old, d_edges_new, d_min)
+                    new_alphas = compute_alpha(new_n, new_S_d, d_min)
+                    new_ll = compute_log_likelihood(
+                        new_n, new_alphas, new_S_d, d_min)
+                    alphas_combined = compute_alpha(
+                        new_n + n_start, new_S_d + S_d_start, d_min)
+                    new_ll_combined = compute_log_likelihood(
+                        new_n + n_start, alphas_combined, new_S_d + S_d_start, d_min)
+                    new_ratios = -2 * new_ll_combined + \
+                        2 * (new_ll + log_likelihood_orig)
+
+                    # Do not consider edges that, if added/removed, would lead to a violation of the
+                    # likelihood ration Chi_square cutoff value.
+                    powerlaw_filter = filter_chisquare(new_ratios, delta_cutoff)
+                    filtered_edges_final = filtered_edges[powerlaw_filter]
+                else:
+                    filtered_edges_final = filtered_edges
 
                 # Compute new entries in A_hat_square_uv
                 a_hat_uv_new = self.compute_new_a_hat_uv(filtered_edges_final)
@@ -752,7 +793,7 @@ class Nettack(LocalAttack):
     """
 
     def __init__(self, n_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray, 
-                 attacked_model: nn.Module):
+                 attacked_model: nn.Module, power_law_test=False):
         """_summary_
 
         Args:
@@ -761,6 +802,9 @@ class Nettack(LocalAttack):
             A (np.ndarray): Adjacency Matrix.
             y (np.ndarray): True Labels.
             attacked_model (nn.Module): LinearGCN / SGC
+            power_law_test (bool): If True, will perform a test for
+                power-law degree preservation. Only enable for CBA! Default:
+                False.
         """
         self.target_idx = n_idx
         self.sp_adj = sp.csr_matrix(A)
@@ -779,7 +823,8 @@ class Nettack(LocalAttack):
                                        self.y,
                                        self.W,
                                        self.target_idx,
-                                       verbose=False)
+                                       verbose=False,
+                                       power_law_test=power_law_test)
         self.nettack.reset()
 
 

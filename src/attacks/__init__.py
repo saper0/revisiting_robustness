@@ -41,7 +41,10 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
         or hyperparams["attack"] == "l2-weak":
         return SimpleAttack(target_idx, X, A, y, hyperparams["attack"])
     if hyperparams["attack"] == "nettack":
-        return Nettack(target_idx, X, A, y, surrogate_model)
+        power_law_test = False
+        if "power_law_test" in hyperparams:
+            power_law_test = hyperparams["power_law_test"]
+        return Nettack(target_idx, X, A, y, surrogate_model, power_law_test)
     if hyperparams["attack"] == "nettack-adapted":
         return NettackAdapted(hyperparams["attack"], target_idx, X, A, y, 
                               model, label_prop, device)
