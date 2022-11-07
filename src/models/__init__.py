@@ -2,14 +2,14 @@ from typing import Any, Dict, Union
 
 from src.models.appnp import APPNP
 from src.models.gat import GAT
-from src.models.gcn import GCN, DenseGCN
+from src.models.gcn import DenseGCN
 from src.models.lp import LP
 from src.models.mlp import MLP
 from src.models.graphsage import GraphSAGE
 from src.models.sgc import SGC
 
 
-MODEL_TYPE = Union[APPNP, DenseGCN, GAT, GCN, SGC, MLP, GraphSAGE, None]
+MODEL_TYPE = Union[APPNP, DenseGCN, GAT, SGC, MLP, GraphSAGE, None]
 
         
 def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
@@ -34,8 +34,6 @@ def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
         return GAT(**hyperparams)
     if hyperparams['model'] == "GATv2":
         return GAT(gat_v2=True, **hyperparams)
-    if hyperparams['model'] == "GCN":
-        return GCN(**hyperparams)
     if hyperparams['model'] is None:
         return None
     if hyperparams['model'] == "SGC":
@@ -47,8 +45,7 @@ def create_model(hyperparams: Dict[str, Any]) -> MODEL_TYPE:
     raise ValueError("Specified model not found.")
 
 
-__all__ = [GCN,
-           APPNP,
+__all__ = [APPNP,
            GAT,
            DenseGCN,
            SGC,

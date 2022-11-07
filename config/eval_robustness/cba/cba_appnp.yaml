@@ -1,7 +1,7 @@
 seml:
-  name: eval_robustness_appnp
+  name: rob_appnp
   executable: exp_eval_robustness.py
-  project_root_dir: ../../
+  project_root_dir: ../../../
   output_dir: log/eval_robustness
 
 slurm:
@@ -10,7 +10,7 @@ slurm:
     gres: gpu:1       # num GPUs
     mem: 10G          # memory
     cpus-per-task: 4  # num cores
-    time: 0-08:30     # max time, D-HH:MM
+    time: 0-01:00     # max time, D-HH:MM
 
 fixed:
 
@@ -21,6 +21,8 @@ fixed:
     K: 10
 
   data_params:
+    graph_model: CBA
+    m: 2
     inductive_samples: 1000
   
   train_params:
@@ -34,15 +36,15 @@ grid:
     max_robustness:
       type: choice
       options:
-        - 100
-        #- 999
+        #- 100
+        - 1000
     attack: 
       type: choice
       options:
-      #- "l2"
-      #- "random"
-      #- "l2-weak"
-      - "nettack"
+      - "l2-weak"
+      - "random"
+      - "l2"
+      #- "nettack"
 
   seed:
     type: choice
@@ -93,7 +95,7 @@ K05:
       alpha: 0.05
 
     train_params:
-      lr: 0.10
+      lr: 0.01
       weight_decay: 0.001
 
     attack_params:
@@ -101,7 +103,7 @@ K05:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.5
+        dropout: 0.3
       surrogate_train_params:
         lr: 0.1
         weight_decay: 0.0001
@@ -115,7 +117,7 @@ K1:
 
     model_params:
       dropout: 0.0
-      alpha: 0.
+      alpha: 0.05
 
     train_params:
       lr: 0.10
@@ -154,7 +156,7 @@ K15:
         dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0001
+        weight_decay: 0.0100
         patience: 300
         max_epochs: 3000
 
@@ -165,11 +167,11 @@ K2:
 
     model_params:
       dropout: 0.0
-      alpha: 0.20
+      alpha: 0.10
 
     train_params:
       lr: 0.01
-      weight_decay: 0.0010
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
@@ -179,7 +181,7 @@ K2:
         dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0001
+        weight_decay: 0.0100
         patience: 300
         max_epochs: 3000
 
@@ -205,7 +207,7 @@ K3:
         dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0010
+        weight_decay: 0.0001
         patience: 300
         max_epochs: 3000
 
@@ -219,18 +221,18 @@ K4:
       alpha: 0.20
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0100
+      lr: 0.01
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.5
+        dropout: 0.0
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0100
+        weight_decay: 0.0010
         patience: 300
         max_epochs: 3000
 
@@ -244,8 +246,8 @@ K5:
       alpha: 0.20
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.100
+      lr: 0.01
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
