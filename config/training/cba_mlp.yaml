@@ -1,5 +1,5 @@
 seml:
-  name: trn_sage
+  name: trn_mlp
   executable: exp_train.py
   project_root_dir: ../../
   output_dir: log/training

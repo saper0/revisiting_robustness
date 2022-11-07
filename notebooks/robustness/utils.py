@@ -1659,7 +1659,7 @@ class ExperimentManager:
         if ylabel is None:
             ylabel=name
         axs.set_ylabel(ylabel, fontsize=xyfontsize, fontweight="bold")
-        axs.set_xlabel(r"\textbf{Node degree}", fontsize=xyfontsize, fontweight="bold")
+        axs.set_xlabel(r"\textbf{Node Degree}", fontsize=xyfontsize, fontweight="bold")
         if logplot:
             axs.set_yscale('log')
         if title is None:

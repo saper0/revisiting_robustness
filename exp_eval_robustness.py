@@ -288,7 +288,8 @@ def run(data_params: Dict[str, Any],
 
     # Robustness Evaluation
     surrogate_model = None
-    if attack_params["attack"] == "nettack":
+    if attack_params["attack"] == "nettack" or \
+        attack_params["attack"] == "nettack_power_law_test":
         # Train surrogate model
         surrogate_model_params = dict(**attack_params["surrogate_model_params"],
                                       n_features=X_np.shape[1], 

@@ -45,6 +45,9 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
         if "power_law_test" in hyperparams:
             power_law_test = hyperparams["power_law_test"]
         return Nettack(target_idx, X, A, y, surrogate_model, power_law_test)
+    if hyperparams["attack"] == "nettack_power_law_test":
+        power_law_test = True
+        return Nettack(target_idx, X, A, y, surrogate_model, power_law_test)
     if hyperparams["attack"] == "nettack-adapted":
         return NettackAdapted(hyperparams["attack"], target_idx, X, A, y, 
                               model, label_prop, device)
