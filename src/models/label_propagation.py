@@ -27,6 +27,7 @@ class LabelPropagation(MessagePassing):
     def __init__(self, num_layers: int, alpha: float):
         super().__init__(aggr='add')
         self.num_layers = num_layers
+        self.K = self.num_layers
         self.alpha = alpha
 
     @torch.no_grad()

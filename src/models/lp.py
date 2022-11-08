@@ -47,6 +47,7 @@ class LP(torch.nn.Module):
                  post_step: Callable = lambda y: y.clamp_(0., 1.)):
         super().__init__()
         self.num_layers = num_layers
+        self.K = self.num_layers
         self.alpha = alpha
         self.prop = LabelPropagation(num_layers, alpha)
         self.softmax = torch.nn.Softmax(dim=1)

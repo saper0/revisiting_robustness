@@ -1,8 +1,8 @@
 seml:
-  name: eval_robustness_lp
+  name: rob_gat_lp
   executable: exp_eval_robustness.py
-  project_root_dir: ../../
-  output_dir: log/eval_robustness/
+  project_root_dir: ../../../
+  output_dir: log/eval_robustness
 
 slurm:
   experiments_per_job: 1
@@ -10,18 +10,23 @@ slurm:
     gres: gpu:1       # num GPUs
     mem: 10G          # memory
     cpus-per-task: 4  # num cores
-    time: 0-00:30     # max time, D-HH:MM
+    time: 0-08:45     # max time, D-HH:MM
 
 fixed:
+
   model_params:
-    label: LP
-    model: None
+    label: GAT
+    model: GAT
+    n_heads: 8
+    n_features_per_head: 8
     use_label_propagation: True
     lp_layers: 50
     lp_alpha: 0.7
     lp_use_clamping: False
 
   data_params:
+    graph_model: CBA
+    m: 2
     inductive_samples: 1000
   
   train_params:
@@ -36,25 +41,41 @@ grid:
       type: choice
       options:
         #- 100
-        - 999
+        - 1000
     attack: 
       type: choice
       options:
-      - "l2"
-      - "random"
       - "l2-weak"
+      - "random"
+      - "l2"
       #- "nettack"
   
   seed:
-    type: range
-    min: 0
-    max: 10
-    step: 1
+    type: choice
+    options:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
 
 K01:
   fixed:
     data_params:
       K: 0.1
+
+    model_params:
+      dropout: 0.0
+      dropout_neighbourhood: 0.0
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
@@ -73,12 +94,20 @@ K05:
     data_params:
       K: 0.5
 
+    model_params:
+      dropout: 0.0
+      dropout_neighbourhood: 0.6
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.0001
+
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.5
+        dropout: 0.3
       surrogate_train_params:
         lr: 0.1
         weight_decay: 0.0001
@@ -89,6 +118,14 @@ K1:
   fixed:
     data_params:
       K: 1.0
+
+    model_params:
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:
@@ -107,6 +144,14 @@ K15:
     data_params:
       K: 1.5
 
+    model_params:
+      dropout: 0.0
+      dropout_neighbourhood: 0.0
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0010
+
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
@@ -115,7 +160,7 @@ K15:
         dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0001
+        weight_decay: 0.0100
         patience: 300
         max_epochs: 3000
 
@@ -124,6 +169,14 @@ K2:
     data_params:
       K: 2.0
 
+    model_params:
+      dropout: 0.0
+      dropout_neighbourhood: 0.6
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0001
+
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
@@ -132,7 +185,7 @@ K2:
         dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0001
+        weight_decay: 0.0100
         patience: 300
         max_epochs: 3000
 
@@ -140,6 +193,14 @@ K3:
   fixed:
     data_params:
       K: 3.0
+
+    model_params:
+      dropout: 0.3
+      dropout_neighbourhood: 0.6
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
@@ -158,15 +219,23 @@ K4:
     data_params:
       K: 4.0
 
+    model_params:
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0010
+
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.5
+        dropout: 0.0
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0001
+        weight_decay: 0.0010
         patience: 300
         max_epochs: 3000
 
@@ -174,6 +243,14 @@ K5:
   fixed:
     data_params:
       K: 5.0
+
+    model_params:
+      dropout: 0.3
+      dropout_neighbourhood: 0.3
+
+    train_params:
+      lr: 0.10
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:

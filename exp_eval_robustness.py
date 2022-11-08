@@ -158,7 +158,7 @@ def configure_hardware(
     device = other_params["device"]
     if not torch.cuda.is_available():
         assert device == "cpu", "CUDA is not availble, set device to 'cpu'"
-    else:
+    elif device != "cpu":
         device = torch.device(f"cuda:{device}")
         logging.info(f"Currently on gpu device {device}")
 
@@ -289,7 +289,8 @@ def run(data_params: Dict[str, Any],
     # Robustness Evaluation
     surrogate_model = None
     if attack_params["attack"] == "nettack" or \
-        attack_params["attack"] == "nettack_power_law_test":
+        attack_params["attack"] == "nettack_power_law_test" or \
+        attack_params["attack"] == "SGA":
         # Train surrogate model
         surrogate_model_params = dict(**attack_params["surrogate_model_params"],
                                       n_features=X_np.shape[1], 
