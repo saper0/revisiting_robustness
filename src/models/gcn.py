@@ -85,7 +85,7 @@ class DenseGCN(nn.Module):
         elif activation == "Identity":
             self.activation = nn.Identity()
         else:
-            raise ValueError("Only ReLU and Identity supportes as activation "
+            raise ValueError("Only ReLU and Identity supported as activation "
                             "functions.")
         self.dropout = dropout
         self.layers = nn.ModuleList([

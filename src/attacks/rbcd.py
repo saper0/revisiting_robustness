@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch import Tensor
 from torch_geometric.utils import to_undirected
 import torch_sparse
@@ -14,11 +15,9 @@ from src.attacks.base_attack import LocalAttack
 _LOSS_TYPE = Callable[[Tensor, Tensor, Optional[Tensor]], Tensor]
 
 
-def tanh_margin_loss(log_logits: Tensor, labels: Tensor,
-                     idx_mask: Optional[Tensor] = None) -> Tensor:
-    """Node-classification loss that focuses on nodes next to dec. boundary.
-
-    Closely related to the margin in probability space. See paper for details."""
+def margin(log_logits: Tensor, labels: Tensor,
+           idx_mask: Optional[Tensor] = None) -> Tensor:
+    """Margin loss used for local attacks. See paper for details."""
     if idx_mask is not None:
         log_logits = log_logits[idx_mask]
         labels = labels[idx_mask]
@@ -30,7 +29,28 @@ def tanh_margin_loss(log_logits: Tensor, labels: Tensor,
         log_logits[np.arange(log_logits.size(0)), labels]
         - log_logits[np.arange(log_logits.size(0)), best_non_target_class]
     )
-    loss = torch.tanh(-margin).mean()
+    return -margin
+
+
+def tanh_margin_loss(log_logits: Tensor, labels: Tensor,
+                     idx_mask: Optional[Tensor] = None) -> Tensor:
+    """Node-classification loss that focuses on nodes next to dec. boundary.
+    Closely related to the margin in probability space. See paper for details."""
+    margin = margin(log_logits, labels, idx_mask)
+    loss = torch.tanh(margin).mean()
+    return loss
+
+
+def masked_cross_entropy(log_logits: Tensor, labels: Tensor,
+                         idx_mask: Optional[Tensor] = None) -> Tensor:
+    """Node-classification loss that focuses on nodes next to dec. boundary. 
+    See paper for details."""
+    if idx_mask is not None:
+        log_logits = log_logits[idx_mask]
+        labels = labels[idx_mask]
+
+    not_flipped = log_logits.argmax(-1) == labels
+    loss = F.cross_entropy(log_logits[not_flipped], labels[not_flipped])
     return loss
 
 
@@ -310,7 +330,7 @@ class GRBCDAttack(RBCDAttack):
                  model: torch.nn.Module,
                  block_size: int = 1_000_000,
                  # Target class has lowest score
-                 loss: _LOSS_TYPE = tanh_margin_loss,
+                 loss: _LOSS_TYPE = masked_cross_entropy,
                  is_undirected_graph: bool = True,
                  epochs: int = 100,
                  log: bool = True,
@@ -351,7 +371,7 @@ class GRBCDAttack(RBCDAttack):
 
         # Get predictions (Algorithm 2, line 7)
         predictions = self.forward(x, edge_index, edge_weight, **kwargs)
-        # Calculate loss combining all each node (Algorithm 2, line 8)
+        # Calculate loss for attacked nodes (Algorithm 2, line 8)
         loss = self.loss(predictions, labels, idx_attack)
         # Retrieve gradient towards the current block (Algorithm 2, line 8)
         gradient = torch.autograd.grad(loss, self.block_edge_weight)[0]
@@ -649,9 +669,11 @@ class RBCDWrapper(LocalAttack):
         self.model = model
 
         if attack == 'PRBCD':
-            self.attack = PRBCDAttack(model, log=False, **kwargs)
+            self.attack = PRBCDAttack(
+                model, log=False, loss=margin, metric=margin, **kwargs)
         else:
-            self.attack = GRBCDAttack(model, epochs=1, log=False, **kwargs)
+            self.attack = GRBCDAttack(
+                model, epochs=1, loss=margin, log=False, **kwargs)
 
         self.edge_index = None
         self.budget = 0
