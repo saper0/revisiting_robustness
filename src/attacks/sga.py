@@ -18,7 +18,35 @@ SubGraph = namedtuple('SubGraph', ['edge_index', 'non_edge_index',
                                    'edges_all'])
 
 
-class SGA(LocalAttack):
+def is_sparse_tensor(tensor):
+    """Check if a tensor is sparse tensor.
+    Parameters
+    ----------
+    tensor : torch.Tensor
+        given tensor
+    Returns
+    -------
+    bool
+        whether a tensor is sparse tensor
+    """
+    # if hasattr(tensor, 'nnz'):
+    if tensor.layout == torch.sparse_coo:
+        return True
+    else:
+        return False
+
+def to_scipy(tensor):
+    """Convert a dense/sparse tensor to scipy matrix"""
+    if is_sparse_tensor(tensor):
+        values = tensor._values()
+        indices = tensor._indices()
+        return sp.csr_matrix((values.cpu().numpy(), indices.cpu().numpy()), shape=tensor.shape)
+    else:
+        indices = tensor.nonzero().t()
+        values = tensor[indices[0], indices[1]]
+        return sp.csr_matrix((values.cpu().numpy(), indices.cpu().numpy()), shape=tensor.shape)
+
+class SGAttack:
     """SGAttack proposed in `Adversarial Attack on Large Scale Graph` TKDE 2021
     <https://arxiv.org/abs/2009.03488>
 
@@ -38,6 +66,8 @@ class SGA(LocalAttack):
         whether to attack graph structure
     attack_features : bool
         whether to attack node features
+    n_perturbations : int
+        Number of (maximal) perturbations on the input graph. 
     device: str
         'cpu' or 'cuda'
 
@@ -64,19 +94,22 @@ class SGA(LocalAttack):
     >>> modified_features = model.modified_features
     """
 
-    def __init__(self, target_idx, surrogate_model, X: np.ndarray, 
-                 A: np.ndarray, y: np.ndarray, device='cpu'):
+    def __init__(self, target_idx, X: np.ndarray, A: np.ndarray, y: np.ndarray, 
+                 surrogate_model, direct=True, n_influencers=3, 
+                 n_perturbations=100, device='cpu'):
         self.surrogate = surrogate_model
         self.nnodes = len(y)
         self.attack_structure = True
         self.attack_features = False
         self.device = device
+        self.direct = direct
+        self.n_influencers = n_influencers
 
         if isinstance(surrogate_model, DenseGCN):
             assert isinstance(surrogate_model.activation, nn.Identity)
-            W1 = surrogate_model.layers[0][0]._linear.weight.T
-            W2 = surrogate_model.layers[1][0]._linear.weight.T
-            W = W1.matmul(W2)
+            W1 = surrogate_model.layers[0][0]._linear.weight
+            W2 = surrogate_model.layers[1][0]._linear.weight
+            W = W2.matmul(W1)
             self.nclass = surrogate_model.n_classes
             self.nfeat = surrogate_model.n_features
             self.hidden_size = surrogate_model.n_filters
@@ -87,8 +120,14 @@ class SGA(LocalAttack):
         self.modified_features = None
 
         self.target_node = target_idx
-        #self.logits = model.predict()
+        self.A = A
+        self.X = X
+        self.y = y
+        self.X_gpu = torch.tensor(X, dtype=torch.float32, device=device)
+        self.A_gpu = torch.tensor(A, dtype=torch.float32, device=device)
+        self.logits = surrogate_model(self.X_gpu, self.A_gpu)
         self.K = surrogate_model.K
+        self.n_perturbations=n_perturbations
 
         self.weight, self.bias = W, None
 
@@ -96,47 +135,35 @@ class SGA(LocalAttack):
     def compute_XW(self):
         return F.linear(self.modified_features, self.weight)
 
-    def attack(self, features, adj, labels, target_node, n_perturbations, direct=True, n_influencers=3, **kwargs):
-        """Generate perturbations on the input graph.
+    def attack(self, **kwargs):
+        """Perturbation generator. Yields perturbations until n_perturbations
+        reached.
 
         Parameters
         ----------
-        features :
-            Original (unperturbed) node feature matrix
-        adj :
-            Original (unperturbed) adjacency matrix
-        labels :
-            node labels
-        target_node : int
-            target_node node index to be attacked
-        n_perturbations : int
-            Number of perturbations on the input graph. Perturbations could
-            be edge removals/additions or feature removals/additions.
         direct: bool
             whether to conduct direct attack
         n_influencers : int
-            number of the top influencers to choose. For direct attack, it will set as `n_perturbations`.
+            number of the top influencers to choose. For direct attack, it 
+            will set as `n_perturbations`.
         """
-        if sp.issparse(features):
-            # to dense numpy matrix
-            features = features.A
-
-        if not torch.is_tensor(features):
-            features = torch.tensor(features, device=self.device)
-
-        if torch.is_tensor(adj):
-            #adj = utils.to_scipy(adj).csr()
-            pass
+        features = self.X_gpu
+        adj = to_scipy(self.A_gpu)
+        labels = self.y
+        target_node = self.target_node
+        n_perturbations=self.n_perturbations
+        direct = self.direct
+        n_influencers = self.n_influencers
 
         self.modified_features = features.requires_grad_(bool(self.attack_features))
 
         target_label = torch.LongTensor([labels[target_node]])
-        best_wrong_label = torch.LongTensor([(self.logits[target_node].cpu() - 1000 * torch.eye(self.logits.size(1))[target_label]).argmax()])
+        best_wrong_label = torch.LongTensor([(self.logits[target_node].cpu() - 
+                1000 * torch.eye(self.logits.size(1))[target_label]).argmax()])
 
         self.selfloop_degree = torch.tensor(adj.sum(1).A1 + 1, device=self.device)
         self.target_label = target_label.to(self.device)
         self.best_wrong_label = best_wrong_label.to(self.device)
-        self.n_perturbations = n_perturbations
         self.ori_adj = adj
         self.target_node = target_node
         self.direct = direct
@@ -158,14 +185,21 @@ class SGA(LocalAttack):
             if self.attack_structure:
                 edge_grad *= (-2 * subgraph.edge_weight + 1)
                 non_edge_grad *= -2 * subgraph.non_edge_weight + 1
-                min_grad = min(edge_grad.min().item(), non_edge_grad.min().item())
-                edge_grad -= min_grad
+                if len(edge_grad) > 0:
+                    min_grad = min(edge_grad.min().item(), non_edge_grad.min().item())
+                    edge_grad -= min_grad
+                    if not direct:
+                        edge_grad[mask] = 0.
+                    max_edge_grad, max_edge_idx = torch.max(edge_grad, dim=0)
+                else:
+                    min_grad = non_edge_grad.min().item()
+                    max_edge_grad = 0
                 non_edge_grad -= min_grad
-                if not direct:
-                    edge_grad[mask] = 0.
-                max_edge_grad, max_edge_idx = torch.max(edge_grad, dim=0)
                 max_non_edge_grad, max_non_edge_idx = torch.max(non_edge_grad, dim=0)
-                max_structure_score = max(max_edge_grad.item(), max_non_edge_grad.item())
+                if len(edge_grad) > 0:
+                    max_structure_score = max(max_edge_grad.item(), max_non_edge_grad.item())
+                else:
+                    max_structure_score = max_non_edge_grad
 
             if self.attack_features:
                 features_grad *= -2 * self.modified_features + 1
@@ -189,10 +223,12 @@ class SGA(LocalAttack):
 
                 u, v = best_edge.tolist()
                 structure_perturbations.append((u, v))
+                yield u, v
             else:
                 u, v = divmod(max_feature_idx.item(), num_features)
                 feature_perturbations.append((u, v))
                 self.modified_features[u, v].data.fill_(1. - self.modified_features[u, v].data)
+                yield u, v
 
         if structure_perturbations:
             modified_adj = adj.tolil(copy=True)
@@ -207,6 +243,8 @@ class SGA(LocalAttack):
         self.modified_features = self.modified_features.detach().cpu().numpy()
         self.structure_perturbations = structure_perturbations
         self.feature_perturbations = feature_perturbations
+        yield None
+
 
     def get_subgraph(self, attacker_nodes, n_influencers=None):
         target_node = self.target_node
@@ -260,12 +298,12 @@ class SGA(LocalAttack):
                                 non_edges[1]].A1 == 0
             non_edges = non_edges[:, mask]
 
-        non_edges = torch.as_tensor(non_edges, device=self.device)
+        non_edges = torch.as_tensor(non_edges, dtype=torch.long, device=self.device)
         unique_nodes = np.union1d(sub_nodes.tolist(), attacker_nodes)
-        unique_nodes = torch.as_tensor(unique_nodes, device=self.device)
+        unique_nodes = torch.as_tensor(unique_nodes, dtype=torch.long, device=self.device)
         self_loop = unique_nodes.repeat((2, 1))
         edges_all = torch.cat([sub_edges, sub_edges[[1, 0]],
-                               non_edges, non_edges[[1, 0]], self_loop], dim=1)
+                               non_edges, non_edges[[1, 0]], self_loop], dim=1).long()
 
         edge_weight = torch.ones(sub_edges.size(1), device=self.device).requires_grad_(bool(self.attack_structure))
         non_edge_weight = torch.zeros(non_edges.size(1), device=self.device).requires_grad_(bool(self.attack_structure))
@@ -326,8 +364,12 @@ class SGA(LocalAttack):
     def ego_subgraph(self):
         edge_index = np.asarray(self.ori_adj.nonzero())
         edge_index = torch.as_tensor(edge_index, dtype=torch.long, device=self.device)
-        sub_nodes, sub_edges, *_ = k_hop_subgraph(int(self.target_node), self.K, edge_index)
-        sub_edges = sub_edges[:, sub_edges[0] < sub_edges[1]]
+        if int(self.target_node) in edge_index:
+            sub_nodes, sub_edges, *_ = k_hop_subgraph(int(self.target_node), self.K, edge_index)
+            sub_edges = sub_edges[:, sub_edges[0] < sub_edges[1]]
+        else:
+            sub_nodes = torch.tensor([], dtype=torch.long, device=self.device)
+            sub_edges = torch.tensor([[],[]], dtype=torch.long, device=self.device)
 
         return sub_nodes, sub_edges
 
@@ -337,3 +379,16 @@ class SGA(LocalAttack):
         inv_degree = torch.pow(degree, -0.5)
         normed_weights = weights * inv_degree[row] * inv_degree[col]
         return normed_weights
+
+
+class SGA(LocalAttack):
+    """Wrapper around SGAttack."""
+    def __init__(self, target_idx, X: np.ndarray, A: np.ndarray, y: np.ndarray, 
+                 surrogate_model, direct=True, n_influencers=3, 
+                 n_perturbations=100, device='cpu'):
+        self.attack = SGAttack(target_idx, X, A, y, surrogate_model, 
+                               n_perturbations=n_perturbations, device=device)
+        self.attack_generator = self.attack.attack()
+
+    def create_adversarial_pert(self):
+        return next(self.attack_generator)

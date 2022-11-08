@@ -11,7 +11,7 @@ from src.attacks.sga import SGA
 from src.attacks.rbcd import RBCDWrapper
 from src.models.lp import LP
 
-ATTACK_TYPE = [SimpleAttack, Nettack, NettackAdapted]
+ATTACK_TYPE = [SimpleAttack, Nettack, NettackAdapted, RBCDWrapper, SGA]
 
 def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
                   hyperparams: Dict[str, Any], 
@@ -51,7 +51,8 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
         power_law_test = True
         return Nettack(target_idx, X, A, y, surrogate_model, power_law_test)
     if hyperparams["attack"] == "SGA":
-        return SGA(target_idx, X, A, y, direct=True, loss_type = "CE", 
+        return SGA(target_idx, X, A, y, surrogate_model,
+                   n_perturbations=hyperparams["max_robustness"],
                    device=device)
     if hyperparams["attack"] == "nettack-adapted":
         return NettackAdapted(hyperparams["attack"], target_idx, X, A, y, 
@@ -60,5 +61,5 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
         return RBCDWrapper(hyperparams["attack"], target_idx, X, A, y,  model)
     raise ValueError("Specified attack not found.")
 
-__all__ = [SimpleAttack, Nettack, NettackAdapted, RBCDWrapper, 
+__all__ = [SimpleAttack, Nettack, NettackAdapted, RBCDWrapper, SGA,
            ATTACK_TYPE, create_attack]
