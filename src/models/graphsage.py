@@ -37,6 +37,7 @@ class GraphSAGE(nn.Module):
 
         self.sage1 = SAGEConv(n_features, hidden_channels)
         self.sage2 = SAGEConv(hidden_channels, n_classes)
+        self.K = 2
 
         self.dropout = nn.Dropout(dropout, inplace=False)
         self.activation = activation

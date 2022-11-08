@@ -96,6 +96,7 @@ class GAT(nn.Module):
                                 bias=bias)
         self.dropout = nn.Dropout(dropout, inplace=False)
         self.activation = activation
+        self.K = 2
 
     def forward(self, data: Union[Data, TensorType["n_nodes", "n_features"]], 
                       adj: Union[SparseTensor, 

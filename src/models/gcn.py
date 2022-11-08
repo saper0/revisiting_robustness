@@ -80,6 +80,7 @@ class DenseGCN(nn.Module):
         self.n_features = n_features
         self.n_filters = n_filters
         self.n_classes = n_classes
+        self.K = 2
         if activation == "ReLU":
             self.activation = nn.ReLU()
         elif activation == "Identity":
