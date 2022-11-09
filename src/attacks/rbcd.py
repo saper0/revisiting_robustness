@@ -25,20 +25,30 @@ def margin(log_logits: Tensor, labels: Tensor,
     sorted = log_logits.argsort(-1)
     best_non_target_class = sorted[sorted != labels[:, None]].reshape(
         log_logits.size(0), -1)[:, -1]
-    margin = (
-        log_logits[np.arange(log_logits.size(0)), labels]
-        - log_logits[np.arange(log_logits.size(0)), best_non_target_class]
+    margin_ = (
+        log_logits[np.arange(log_logits.size(0)), best_non_target_class]
+        - log_logits[np.arange(log_logits.size(0)), labels]
     )
-    return -margin
+    return margin_
 
 
 def tanh_margin_loss(log_logits: Tensor, labels: Tensor,
                      idx_mask: Optional[Tensor] = None) -> Tensor:
     """Node-classification loss that focuses on nodes next to dec. boundary.
     Closely related to the margin in probability space. See paper for details."""
-    margin = margin(log_logits, labels, idx_mask)
-    loss = torch.tanh(margin).mean()
+    margin_ = margin(log_logits, labels, idx_mask)
+    loss = torch.tanh(margin_).mean()
     return loss
+
+
+def probability_margin_loss(log_logits: Tensor, labels: Tensor,
+                            idx_mask: Optional[Tensor] = None) -> Tensor:
+    """Node-classification loss that focuses on nodes next to dec. boundary.
+    See `Are Defenses for Graph Neural Networks Robust? 
+    <https://www.cs.cit.tum.de/daml/are-gnn-defenses-robust/>` for details."""
+    logits = F.softmax(log_logits, dim=-1)
+    margin_ = margin(logits, labels, idx_mask)
+    return margin_.mean()
 
 
 def masked_cross_entropy(log_logits: Tensor, labels: Tensor,
@@ -98,7 +108,7 @@ class RBCDAttack(Attack):
                  model: torch.nn.Module,
                  block_size: int = 1_000_000,
                  # Target class has lowest score
-                 loss: _LOSS_TYPE = tanh_margin_loss,
+                 loss: _LOSS_TYPE = probability_margin_loss,
                  is_undirected_graph: bool = True,
                  log: bool = True,
                  **kwargs) -> None:
@@ -433,8 +443,8 @@ class PRBCDAttack(RBCDAttack):
                  epochs_resampling: int = 100,
                  epochs_finetuning: int = 25,
                  # Target class has lowest score
-                 loss: _LOSS_TYPE = tanh_margin_loss,
-                 metric: _LOSS_TYPE = tanh_margin_loss,
+                 loss: _LOSS_TYPE = probability_margin_loss,
+                 metric: _LOSS_TYPE = probability_margin_loss,
                  lr: float = 100,
                  is_undirected_graph: bool = True,
                  log: bool = True,
@@ -668,12 +678,13 @@ class RBCDWrapper(LocalAttack):
         self.y = torch.tensor(y)
         self.model = model
 
+        eps = 5e-2 if 'GAT' in type(model).__name__.upper() else 1e-7
         if attack == 'PRBCD':
             self.attack = PRBCDAttack(
-                model, log=False, loss=margin, metric=margin, **kwargs)
+                model, log=False, loss=margin, metric=margin, eps=eps **kwargs)
         else:
             self.attack = GRBCDAttack(
-                model, epochs=1, loss=margin, log=False, **kwargs)
+                model, log=False, epochs=1, loss=margin, eps=eps, **kwargs)
 
         self.edge_index = None
         self.budget = 0

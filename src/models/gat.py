@@ -1,18 +1,44 @@
-from typing import Tuple, Union
+from typing import Optional, Tuple, Union
 
 from torch import nn
 from torch import Tensor
+import torch.nn.functional as F
 from torch_geometric.data import Data
-from torch_geometric.nn import GATConv, GATv2Conv
+from torch_geometric.nn import GATConv as PGGATConv, GATv2Conv
+from torch_geometric.utils import softmax
 from torch_sparse import SparseTensor
 from torchtyping import TensorType
 
 from src.models.utils import process_input
 
+
+class GATConv(PGGATConv):
+
+    def message(self, x_j: Tensor, alpha_j: Tensor, alpha_i: Optional[Tensor],
+                edge_attr: Optional[Tensor], index: Tensor,
+                ptr: Optional[Tensor], size_i: Optional[int]) -> Tensor:
+        # Given edge-level attention coefficients for source and target nodes,
+        # we simply need to sum them up to "emulate" concatenation:
+        alpha = alpha_j if alpha_i is None else alpha_j + alpha_i
+        alpha = F.leaky_relu(alpha, self.negative_slope)
+
+        if edge_attr is not None:
+            assert edge_attr.dim() == 1, 'Only scalar edge weights supported'
+            edge_attr = edge_attr.view(-1, 1)
+            # Alpha remains unchanged if edge_attr == 1 and is
+            # -Inf if edge_attr == 0
+            alpha = alpha + (1 - 1 / edge_attr)
+
+        alpha = softmax(alpha, index, ptr, size_i)
+        self._alpha = alpha  # Save for later use.
+        alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+        return x_j * alpha.unsqueeze(-1)
+
+
 class GAT(nn.Module):
     """Two layer GAT implementation following Veličković et al. "Graph 
     Attention Netowrks", ICLR 2018. 
-    
+
     Basically a wrapper for torch_geometric's GATConv. Default values 
     represent original published parametrization for Cora. 
 
@@ -46,29 +72,31 @@ class GAT(nn.Module):
         If set to False, will not add self-loops to the input graph. 
         (Default: True)
     """
+
     def __init__(self,
                  n_features: int,
                  n_classes: int,
                  activation: Union[str, nn.Module] = nn.ELU(),
-                 n_heads: int = 8, 
+                 n_heads: int = 8,
                  n_features_per_head: int = 8,
                  negative_slope: float = 0.2,
                  bias: bool = True,
                  dropout: float = 0.6,
                  dropout_neighourhood: float = 0.6,
-                 add_self_loops: bool = True, 
+                 add_self_loops: bool = True,
                  gat_v2: bool = False,
                  **kwargs):
         super().__init__()
         if not gat_v2:
-            self.gat1 = GATConv(in_channels=n_features, 
+            self.gat1 = GATConv(in_channels=n_features,
                                 out_channels=n_features_per_head,
-                                heads=n_heads, 
-                                concat=True, 
+                                heads=n_heads,
+                                concat=True,
                                 negative_slope=negative_slope,
                                 dropout=dropout_neighourhood,
                                 add_self_loops=add_self_loops,
-                                bias=bias)
+                                bias=bias,
+                                fill_value=1.)
             self.gat2 = GATConv(in_channels=n_heads*n_features_per_head,
                                 out_channels=n_classes,
                                 heads=1,
@@ -76,38 +104,41 @@ class GAT(nn.Module):
                                 negative_slope=negative_slope,
                                 dropout=dropout_neighourhood,
                                 add_self_loops=add_self_loops,
-                                bias=bias)
+                                bias=bias,
+                                fill_value=1.)
         else:
-            self.gat1 = GATv2Conv(in_channels=n_features, 
-                                out_channels=n_features_per_head,
-                                heads=n_heads, 
-                                concat=True, 
-                                negative_slope=negative_slope,
-                                dropout=dropout_neighourhood,
-                                add_self_loops=add_self_loops,
-                                bias=bias)
+            self.gat1 = GATv2Conv(in_channels=n_features,
+                                  out_channels=n_features_per_head,
+                                  heads=n_heads,
+                                  concat=True,
+                                  negative_slope=negative_slope,
+                                  dropout=dropout_neighourhood,
+                                  add_self_loops=add_self_loops,
+                                  bias=bias)
             self.gat2 = GATv2Conv(in_channels=n_heads*n_features_per_head,
-                                out_channels=n_classes,
-                                heads=1,
-                                concat=False,
-                                negative_slope=negative_slope,
-                                dropout=dropout_neighourhood,
-                                add_self_loops=add_self_loops,
-                                bias=bias)
+                                  out_channels=n_classes,
+                                  heads=1,
+                                  concat=False,
+                                  negative_slope=negative_slope,
+                                  dropout=dropout_neighourhood,
+                                  add_self_loops=add_self_loops,
+                                  bias=bias)
         self.dropout = nn.Dropout(dropout, inplace=False)
         self.activation = activation
         self.K = 2
 
-    def forward(self, data: Union[Data, TensorType["n_nodes", "n_features"]], 
-                      adj: Union[SparseTensor, 
-                                 Tuple[TensorType[2, "nnz"], TensorType["nnz"]],
-                                 TensorType["n_nodes", "n_nodes"]]) -> Tensor:
+    def forward(self, data: Union[Data, TensorType["n_nodes", "n_features"]],
+                adj: Union[SparseTensor,
+                           Tuple[TensorType[2, "nnz"],
+                                 TensorType["nnz"]],
+                           TensorType["n_nodes", "n_nodes"]]) -> Tensor:
         # Extract feature matrix, edge indices & values from arguments
         x, edge_index, edge_weight = process_input(data, adj)
+        if not isinstance(self.gat1, GATConv):
+            edge_weight = None
         x = self.dropout(x)
-        x = self.activation(self.gat1(x, edge_index))
+        x = self.activation(self.gat1(x, edge_index, edge_attr=edge_weight))
         x = self.dropout(x)
-        x = self.gat2(x, edge_index)
+        x = self.gat2(x, edge_index, edge_attr=edge_weight)
 
         return x
-
