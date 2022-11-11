@@ -1,15 +1,17 @@
 seml:
-  name: eval_robustness_mlp_lp
+  name: r_mlp_lp
   executable: exp_eval_robustness.py
-  project_root_dir: ../../
+  project_root_dir: ../../../
   output_dir: log/eval_robustness/
 
 slurm:
   experiments_per_job: 1
   sbatch_options:
-    gres: gpu:1       # num GPUs
+    qos: phdcpu      
+    partition: cpu
+    gres: gpu:0       # num gpu
     mem: 10G          # memory
-    cpus-per-task: 4  # num cores
+    cpus-per-task: 1  # num cores
     time: 0-08:30     # max time, D-HH:MM
 
 fixed:
@@ -28,6 +30,7 @@ fixed:
     inductive: True
 
   other_params:
+    device: cpu
     sacred_metrics: False
 
 grid:
@@ -35,16 +38,17 @@ grid:
     max_robustness:
       type: choice
       options:
-        #- 100
-        - 999
+        - 100
+        #- 999
     attack: 
       type: choice
       options:
-      - "l2"
-      - "random"
-      - "l2-weak"
+      #- "l2"
+      #- "random"
+      #- "l2-weak"
+      - SGA
       #- "nettack"
-  
+    
   seed:
     type: range
     min: 0

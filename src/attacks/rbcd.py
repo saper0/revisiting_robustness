@@ -678,7 +678,7 @@ class RBCDWrapper(LocalAttack):
         self.y = torch.tensor(y)
         self.model = model
 
-        eps = 5e-2 if 'GAT' in type(model).__name__.upper() else 1e-7
+        eps = 1e-2 if 'GAT' in type(model).__name__.upper() else 1e-7
         if attack == 'PRBCD':
             self.attack = PRBCDAttack(
                 model, log=False, loss=margin, metric=margin, eps=eps **kwargs)
