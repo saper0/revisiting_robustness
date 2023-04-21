@@ -1,0 +1,63 @@
+seml:
+  name: train_inductive_arxiv
+  executable: experiment_train_inductive.py
+  project_root_dir: ../..
+  output_dir: config/train/output
+
+slurm:
+  experiments_per_job: 1
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 16G
+    cpus-per-task: 4  # num cores
+    time: 0-01:00     # max time, D-HH:MM
+
+fixed:
+  train_params:
+    lr: 1e-2
+    weight_decay: 0
+    patience: 300
+    max_epochs: 3000
+  artifact_dir: cache
+  model_storage_type: overrobust
+  device: 0
+  data_device: 0
+  data_dir: datasets/
+  dataset: ogbn-arxiv
+  make_undirected: True
+  binary_attr: False
+
+grid:
+  seed:
+    type: choice
+    options:
+      - 0
+      - 1
+      - 5
+      - 6
+      - 7
+
+gcn:
+  fixed:
+    model_params:
+      label: GCN
+      model: GCN
+      n_filters: [256, 256]
+      dropout: 0.5
+      gdc_params: None
+      svd_params: None
+      jaccard_params: None
+      do_cache_adj_prep: False
+
+# appnp:
+#   fixed:
+#     model_params:
+#       label: APPNP
+#       model: GPRGNN
+#       alpha: 0.1
+#       dropout_before_GPR: 0
+#       drop_whole_nodes: True
+#       hidden: 64
+#       K: 10
+#       ppnp: 'PPNP'
+#       softmax: False
