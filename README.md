@@ -29,22 +29,6 @@ pytest 7.0.0 (optional: only for performing unit tests)
 
 All experiments use [seml](https://github.com/TUM-DAML/seml). For an introduction into *seml*, we refer to the [official examples](https://github.com/TUM-DAML/seml/tree/master/examples) on the *seml* github repository. 
 
-## Hyperparameter Search
-
-The experiment code to train the models used for hyperparameter search is collected in `exp_train.py`. The corresponding *seml* experiment configuration files can be found in [config/training](config/training).
-
-Exemplary, the corresponding configuration file for the GCN architecture is `csbm_gcn.yaml`. Training the GCNs can then be performed by executing:
-
-```
-seml [mongodb-collection-name] add config/training/csbm_gcn.yaml start
-```
-
-Optionally, the experiments can be run locally by adding the `--local` flag:
-
-```
-seml [mongodb-collection-name] add config/training/csbm_gcn.yaml start --local
-```
-
 ## Analysing (Over-) Robustness
 
 The code in `exp_eval_robustness.py` trains a models with the provided hyperparameters and then, analysis its classic as well as semantic-aware robustness. The corresponding *seml* experiment configuration files can be found in [config/eval_robustness](config/eval_robustness/). 
@@ -58,6 +42,23 @@ seml [mongodb-collection-name] add config/eval_robustness/csbm_gcn_lp.yaml start
 again, optionally adding the `--local` flag. 
 
 Individually configured experiments can also be run without using the *seml* command-line interface and without requiring a MongoDB using the provided [exp.ipynb](exp.ipynb). 
+
+## Hyperparameter Search
+
+The experiment code to do a hyperparameter search for a given model is collected in `exp_train.py`. The corresponding *seml* experiment configuration files can be found in [config/training](config/training).
+
+Exemplary, the corresponding configuration file for the GCN architecture is `csbm_gcn.yaml`. Training the GCNs can then be performed by executing:
+
+```
+seml [mongodb-collection-name] add config/training/csbm_gcn.yaml start
+```
+
+Optionally, the experiments can be run locally by adding the `--local` flag:
+
+```
+seml [mongodb-collection-name] add config/training/csbm_gcn.yaml start --local
+```
+
 
 # Cite
 
