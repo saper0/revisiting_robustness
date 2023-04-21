@@ -1,6 +1,10 @@
 # Revisiting Robustness in Graph Machine Learning
 
-This codebase has been used to generate all results based on contextual stochastic block models in our submitted paper *Revisiting Robustness in Graph Machine Learning*.
+This codebase has been used to generate all results found in the ICLR 2023 paper *Revisiting Robustness in Graph Machine Learning*. 
+
+The following instructions refer to the codebase found in the [src](src/) folder and have been used to generate all results pertaining random graph models (contextual stochastic block models / contextual Barabási-Albert models with community structure).
+
+The codebase for the real world experiments including a separate installation and usage description can be found in the folder 
 
 # Installation
 
