@@ -1,6 +1,6 @@
 # Overrobustness of GNNs on real-world datasets
 
-This codebase has been used to generate all results based on the real-world datasets in our submitted paper *Revisiting Robustness in Graph Machine Learning*.
+This codebase has been used to generate all results based on the real-world datasets in the ICLR 2023 paper *Revisiting Robustness in Graph Machine Learning*.
 
 ## Installation
 
