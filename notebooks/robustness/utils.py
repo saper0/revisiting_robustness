@@ -607,6 +607,7 @@ class ExperimentManager:
 
     def get_value_in_table(self, name: str, attack: str, models: List[str],
                            budget: str=None, use_mean=True, use_std=False,
+                           postfix="%",
                            K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
         columns = {}
         added_bayes = {}
@@ -616,18 +617,18 @@ class ExperimentManager:
                 columns[key] = {}
             mean, std = exp.get_measurement(name, budget)
             if use_mean and not use_std:
-                columns[key][label] = f"{mean*100:.1f}%"
+                columns[key][label] = f"{mean*100:.1f}" + postfix
             if not use_mean and use_std:
-                columns[key][label] = f"{std*100:.1f}%"
+                columns[key][label] = f"{std*100:.1f}" + postfix
             if use_mean and use_std:
-                columns[key][label] = f"{mean*100:.1f}+{std*100:.1f}%"
+                columns[key][label] = f"{mean*100:.1f}+{std*100:.1f}"+ + postfix
             if "BC" in models and key not in added_bayes:
                 mean, std = exp.get_measurement(name+"-bayes", budget)
-                columns[key]["Bayes Classifier (BC)"] = f"{mean*100:.1f}%"
+                columns[key]["Bayes Classifier (BC)"] = f"{mean*100:.1f}" + postfix
                 mean, std = exp.get_measurement("c_acc_bayes_feature", budget)
-                columns[key]["BC (Features Only)"] = f"{mean*100:.1f}%"
+                columns[key]["BC (Features Only)"] = f"{mean*100:.1f}" + postfix
                 mean, std = exp.get_measurement("c_acc_bayes_structure", budget)
-                columns[key]["BC (Structure Only)"] = f"{mean*100:.1f}%"
+                columns[key]["BC (Structure Only)"] = f"{mean*100:.1f}" + postfix
                 added_bayes[key] = ""
         f = pd.DataFrame.from_dict(columns)
         f = f.reindex(sorted(f.columns), axis=1)
@@ -818,6 +819,7 @@ class ExperimentManager:
              legendfont=17, outside_legend=False, linewidth=2.5, markersize=8,
              ylim = None, bbox_to_anchor=(1.005, 1.011), handlelength=1.35,
              labelspacing = 0.1, borderpad=0.2, tickfontweight="bold",
+             tight_layout=True, poster=False,
              K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
         """Plot relative or absolute over-robustness measure.
 
@@ -854,6 +856,7 @@ class ExperimentManager:
         #ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
         #                  cycler('color', color_list))
         added_bayes = False
+        handle_l = []
         for label, exp_by_k in self.model_iterator(attack, models):
             x = []
             y = []
@@ -886,13 +889,28 @@ class ExperimentManager:
             if label == "GraphSAGE":
                 label = "GraphSAGE"
             if label == "GraphSAGE+LP":
-                label = "GraphSAGE+LP"
+                label = "SAGE+LP"
             if fontweight == "bold":
                 label = f"\\textbf{{{label}}}"
             if errorbars:
                 y_err = np.array(y_err)[sort_ids]
-                ax.errorbar(x, y, yerr=y_err, marker="o", color=color, linestyle=linestyle,
-                            label=label, capsize=5, linewidth=linewidth, markersize=markersize)
+                line = ax.errorbar(x, y, yerr=y_err, marker="o", color=color, 
+                                   linestyle=linestyle, label=label, capsize=5, 
+                                   linewidth=linewidth, markersize=markersize)
+                if linestyle == "--":
+                    linestyle = ":"
+                #handles,labels=ax.get_legend_handles_labels()
+                #handle_l.append(handles)
+                handle = matplotlib.lines.Line2D([0], [0], linestyle=linestyle, 
+                                          color=color, marker='o', linewidth=2,
+                                          markersize=5,label=label)
+                from matplotlib.container import ErrorbarContainer
+                from matplotlib.collections import LineCollection
+                barline = LineCollection(np.empty((2,2,2)), colors=color)
+                err = ErrorbarContainer((handle, [handle], [barline]), 
+                                         has_xerr=False, has_yerr=True, 
+                                         label=label)
+                handle_l.append(err)
                 if "BC" in models and not added_bayes:
                     y_bc = np.array(y_bc)[sort_ids]
                     y_err_bc = np.array(y_err_bc)[sort_ids] 
@@ -921,10 +939,11 @@ class ExperimentManager:
             ax.set_xticks(xticks, minor=True)
         elif spacing == "even":
             ax.xaxis.set_ticks(x, minor=False)
+            xticks = [f"{K}" for K in K_l]
+            if poster:
+                xticks = ["Low", "", "", "Medium", "", "", "", "High"]
             if tickfontweight=="bold":
-                xticks = [f"\\textbf{{{K}}}" for K in K_l]
-            else:
-                xticks = [f"{K}" for K in K_l]
+                xticks = [f"\\textbf{{{x}}}" for x in xticks]
             ax.xaxis.set_ticklabels(xticks, fontsize=tickfont)
             ax.set_xlim(left=-0.3)
             if ylim is not None:
@@ -934,7 +953,10 @@ class ExperimentManager:
             ax.set_xlim(left=0.)
         ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
         ax.set_ylabel(ylabel, fontsize=xylabelfont)
-        xlabel = "K"
+        if poster:
+            xlabel = "Informativeness of node features"
+        else:
+            xlabel = "K"
         if fontweight == "bold":
             xlabel = f"\\textbf{{{xlabel}}}"
         ax.set_xlabel(xlabel, fontsize=xylabelfont)
@@ -956,9 +978,16 @@ class ExperimentManager:
         if outside_legend:
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width*width, box.height])
+            #from matplotlib.legend_handler import HandlerErrorbar
             leg = ax.legend(loc=legend_loc, ncol=legend_cols, shadow=False,
-                            bbox_to_anchor=(1, 1), frameon=False, markerscale=1,
-                            prop=dict(size=legendfont))
+                            bbox_to_anchor=(1, 1.05), frameon=False,
+                            prop=dict(size=legendfont),
+                            handles=handle_l,    
+                            #handler_map={type(line): HandlerErrorbar(xerr_size=0.3,
+                            #    markersize=3)},
+                            labelspacing=labelspacing, 
+                            handlelength=handlelength,    
+                            )
         else:
             #ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
             #        bbox_to_anchor=(0.5, 1.028), frameon=True,
@@ -975,7 +1004,341 @@ class ExperimentManager:
                     labelspacing=labelspacing, ncol=legend_cols, handletextpad=0.4,
                     handlelength=handlelength, columnspacing=0.2, borderaxespad=0.2,
                     borderpad=borderpad)
-        fig.set_tight_layout(True)
+        fig.set_tight_layout(tight_layout)
+        plt.show()
+
+    def plot_iclr_video(self, name: str, attack: str, models: List[str], 
+             errorbars: bool=True, ylabel: str=None, title: str=None,
+             spacing: str="normal", legend_loc="best", legend_cols: int=None,
+             budget: str=None, yspacing: str="normal", width=0.86, ratio=1.618,
+             titlefont=20, fontweight="bold", tickfont=17, xylabelfont=20,
+             legendfont=17, outside_legend=False, linewidth=2.5, markersize=8,
+             ylim = None, bbox_to_anchor=(1.005, 1.011), handlelength=1.35,
+             labelspacing = 0.1, borderpad=0.2, tickfontweight="bold",
+             tight_layout=True, poster=False,
+             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
+        """Plot relative or absolute over-robustness measure.
+
+        Args:
+            name (str): What measurement to plot:
+                - over-robustness
+                - relative-over-robustness
+                - f_wrt_y (allows for BC model)
+                - adversarial-robustness
+                - relative-adversarial-robustness
+                - validation-accuracy
+                - test-accuracy
+                - f1-robustness
+                - f1-min-changes
+            attack (str): 
+            models (List[str]): White-list
+            errorbars (bool): True or False
+            ylabel: Label of y-axis. If not provided it is set to "name".
+            title: Title of plot. If not provided it is set to "name".
+            K_l:List[float]=[0.1, 0.5, 1, 1.5, 2, 5]. White-list
+        """
+        h, w = matplotlib.figure.figaspect(ratio / width)
+        fig, ax = plt.subplots(figsize=(w,h))
+        #color_list = ['r', 
+        #              'tab:green', 
+        #              'b', 
+        #              'lime', 
+        #              'slategrey', 
+        #              'k', 
+        #              "lightsteelblue",
+        #              "antiquewhite",
+        #              ]
+        #linestyle_list = ['-', '--', ':', '-.']
+        #ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
+        #                  cycler('color', color_list))
+        added_bayes = False
+        handle_l = []
+        for label, exp_by_k in self.model_iterator(attack, models):
+            x = []
+            y = []
+            y_err = []
+            y_bc = []
+            y_err_bc = []
+            for K, exp in exp_by_k.items():
+                if K not in K_l:
+                    continue
+                x.append(K)
+                value, std = exp.get_measurement(name, budget)
+                y.append(value)
+                y_err.append(std)
+                if "BC" in models and not added_bayes:
+                    if name == "f_wrt_y":
+                        value, std = exp.get_measurement("g_wrt_y", budget)
+                    elif name == "test-accuracy":
+                        value, std = exp.get_measurement("test-accuracy-bayes")
+                    else:
+                        raise ValueError("BC requested but name not f_wrt_y")
+                    y_bc.append(value)
+                    y_err_bc.append(std)
+            sort_ids = np.argsort(x)
+            if spacing == "even":
+                x = [i for i in range(len(K_l))]
+            else:
+                x = K_l
+            y = np.array(y)[sort_ids]
+            color, linestyle = self.get_style(label)
+            if label == "GraphSAGE":
+                label = "GraphSAGE"
+            if label == "GraphSAGE+LP":
+                label = "SAGE+LP"
+            if fontweight == "bold":
+                label = f"\\textbf{{{label}}}"
+            if errorbars:
+                y_err = np.array(y_err)[sort_ids]
+                line = ax.errorbar(x, y, yerr=y_err, marker="o", color=color, 
+                                   linestyle=linestyle, label=label, capsize=5, 
+                                   linewidth=linewidth, markersize=markersize)
+                if linestyle == "--":
+                    linestyle = ":"
+                #handles,labels=ax.get_legend_handles_labels()
+                #handle_l.append(handles)
+                handle = matplotlib.lines.Line2D([0], [0], linestyle=linestyle, 
+                                          color=color, marker='o', linewidth=2,
+                                          markersize=5,label=label)
+                from matplotlib.container import ErrorbarContainer
+                from matplotlib.collections import LineCollection
+                barline = LineCollection(np.empty((2,2,2)), colors=color)
+                err = ErrorbarContainer((handle, [handle], [barline]), 
+                                         has_xerr=False, has_yerr=True, 
+                                         label=label)
+                handle_l.append(err)
+                if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
+                    y_err_bc = np.array(y_err_bc)[sort_ids] 
+                    ax.errorbar(x, y_bc, yerr=y_err_bc, fmt="s:", 
+                                label="Bayes Classifier", color="tab:olive",
+                                capsize=5, linewidth=3, markersize=9)
+            else:
+                ax.plot(x, y, marker="o",  color=color, linestyle=linestyle, 
+                        label=label)
+                if "BC" in models and not added_bayes:
+                    y_bc = np.array(y_bc)[sort_ids]
+                    ax.plot(x, y_bc, "s:", label="Bayes Classifier")
+            added_bayes = True
+        if ylabel is None:
+            ylabel=name
+        
+        ax.xaxis.get_major_formatter()._usetex = True
+        ax.yaxis.get_major_formatter()._usetex = True
+        if title is None:
+            title=name
+        if yspacing == "log":
+            ax.set_yscale('log')
+        if spacing == "log":
+            ax.set_xscale('log')
+            xticks = np.sort(K_l.append([0.2, 10]))
+            ax.set_xticks(xticks, minor=True)
+        elif spacing == "even":
+            ax.xaxis.set_ticks(x, minor=False)
+            xticks = [f"{K}" for K in K_l]
+            if poster:
+                xticks = ["High", "", "", "Medium", "", "", "", "Low"]
+            if tickfontweight=="bold":
+                xticks = [f"\\textbf{{{x}}}" for x in xticks]
+            ax.xaxis.set_ticklabels(xticks, fontsize=tickfont)
+            ax.set_xlim(left=-0.3)
+            if ylim is not None:
+                ax.set_ylim(top=ylim)
+        else:
+            ax.set_xticks(K_l, minor=False)
+            ax.set_xlim(left=0.)
+        ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
+        ax.set_ylabel(ylabel, fontsize=xylabelfont)
+        if poster:
+            xlabel = "Importance of graph structure"
+        else:
+            xlabel = "K"
+        if fontweight == "bold":
+            xlabel = f"\\textbf{{{xlabel}}}"
+        ax.set_xlabel(xlabel, fontsize=xylabelfont)
+        ax.set_title(title, fontweight=fontweight, fontsize=titlefont)
+        if tickfontweight=="bold":
+            ax.set_yticklabels([f"\\textbf{{{round(i*100, 0):.0f}}}" for i in ax.get_yticks()], fontsize=tickfont)
+        else:
+            ax.set_yticklabels([f"{round(i*100, 0):.0f}" for i in ax.get_yticks()], fontsize=tickfont)
+        #ax.set_yticklabels([f"{round(i, 1):.1f}" for i in ax.get_yticks()], fontsize=tickfont)
+        #ax.set_xticklabels(ax.get_xticks(), fontsize=13)
+        ax.yaxis.grid()
+        ax.xaxis.grid()
+        if legend_cols is None:
+            ax.legend(loc=legend_loc)
+        #Titlepicture:
+        #ax.legend(prop=dict(size=legendfont, weight="bold"), loc=legend_loc, 
+        #          bbox_to_anchor=(1.018, 1.04), frameon=True,
+        #          labelspacing=0.12, handleheight=0.5)
+        if outside_legend:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width*width, box.height])
+            #from matplotlib.legend_handler import HandlerErrorbar
+            leg = ax.legend(loc=legend_loc, ncol=legend_cols, shadow=False,
+                            bbox_to_anchor=(1, 1.05), frameon=False,
+                            prop=dict(size=legendfont),
+                            handles=handle_l,    
+                            #handler_map={type(line): HandlerErrorbar(xerr_size=0.3,
+                            #    markersize=3)},
+                            labelspacing=labelspacing, 
+                            handlelength=handlelength,    
+                            )
+        else:
+            #ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+            #        bbox_to_anchor=(0.5, 1.028), frameon=True,
+            #        labelspacing=0.1, handleheight=0.3, ncol=legend_cols,
+            #        handlelength=1, columnspacing=0.2)
+            #Titlepicture:
+            #ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+            #        bbox_to_anchor=bbox_to_anchor, frameon=True,
+            #        labelspacing=0.1, ncol=legend_cols, handletextpad=0.4,
+            #        handlelength=1.35, columnspacing=0.2, borderaxespad=0.2,
+            #        borderpad=0.2)
+            ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+                    bbox_to_anchor=bbox_to_anchor, frameon=True,
+                    labelspacing=labelspacing, ncol=legend_cols, handletextpad=0.4,
+                    handlelength=handlelength, columnspacing=0.2, borderaxespad=0.2,
+                    borderpad=borderpad)
+        fig.set_tight_layout(tight_layout)
+        plt.show()
+
+    def plot_data(self, data_l: List[List[float]], ylegend: List[str], 
+             errorbars: bool=True, ylabel: str=None, title: str=None,
+             spacing: str="normal", legend_loc="best", legend_cols: int=None,
+             budget: str=None, yspacing: str="normal", width=0.86, ratio=1.618,
+             titlefont=20, fontweight="bold", tickfont=17, xylabelfont=20,
+             legendfont=17, outside_legend=False, linewidth=2.5, markersize=8,
+             ylim = None, bbox_to_anchor=(1.005, 1.011), handlelength=1.35,
+             labelspacing = 0.1, borderpad=0.2, tickfontweight="bold",
+             tight_layout=True, poster=False,
+             K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 3, 4, 5]):
+        """Plot relative or absolute over-robustness measure.
+
+        Args:
+            data_l: y-values to plot
+            models (List[str]): White-list
+            errorbars (bool): True or False
+            ylabel: Label of y-axis. If not provided it is set to "name".
+            title: Title of plot. If not provided it is set to "name".
+            K_l:List[float]=[0.1, 0.5, 1, 1.5, 2, 5]. White-list
+        """
+        h, w = matplotlib.figure.figaspect(ratio / width)
+        fig, ax = plt.subplots(figsize=(w,h))
+        #color_list = ['r', 
+        #              'tab:green', 
+        #              'b', 
+        #              'lime', 
+        #              'slategrey', 
+        #              'k', 
+        #              "lightsteelblue",
+        #              "antiquewhite",
+        #              ]
+        #linestyle_list = ['-', '--', ':', '-.']
+        #ax.set_prop_cycle(cycler('linestyle', linestyle_list)*
+        #                  cycler('color', color_list))
+        colors = ["r", "b", "k"]
+        linestyles = "-"
+        added_bayes = False
+        handle_l = []
+        x = [i for i in range(len(K_l))]
+        i = 0
+        for legend, y in zip(ylegend, data_l):
+            color = colors[i]
+            linestyle = linestyles[0]
+            ax.plot(x, y, marker="o",  color=color, linestyle=linestyle, 
+                    label=legend, linewidth=linewidth)
+            handle = matplotlib.lines.Line2D([0], [0], linestyle=linestyle, 
+                                          color=color, marker='o', linewidth=2,
+                                          markersize=5,label=legend)
+            from matplotlib.container import ErrorbarContainer
+            from matplotlib.collections import LineCollection
+            barline = LineCollection(np.empty((2,2,2)), colors=color)
+            err = ErrorbarContainer((handle, [handle], [barline]), 
+                                        has_xerr=False, has_yerr=False, 
+                                        label=legend)
+            handle_l.append(err)
+            i = i + 1
+        if ylabel is None:
+            ylabel=""
+        
+        ax.xaxis.get_major_formatter()._usetex = True
+        ax.yaxis.get_major_formatter()._usetex = True
+
+        if yspacing == "log":
+            ax.set_yscale('log')
+        if spacing == "log":
+            ax.set_xscale('log')
+            xticks = np.sort(K_l.append([0.2, 10]))
+            ax.set_xticks(xticks, minor=True)
+        elif spacing == "even":
+            ax.xaxis.set_ticks(x, minor=False)
+            xticks = [f"{K}" for K in K_l]
+            if poster:
+                xticks = ["High", "", "", "Medium", "", "", "", "Low"]
+            if tickfontweight=="bold":
+                xticks = [f"\\textbf{{{x}}}" for x in xticks]
+            ax.xaxis.set_ticklabels(xticks, fontsize=tickfont)
+            ax.set_xlim(left=-0.3)
+            if ylim is not None:
+                ax.set_ylim(top=ylim)
+        else:
+            ax.set_xticks(K_l, minor=False)
+            ax.set_xlim(left=0.)
+        ax.xaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
+        ax.set_ylabel(ylabel, fontsize=xylabelfont)
+        if poster:
+            xlabel = "Importance of graph structure"
+        else:
+            xlabel = "K"
+        if fontweight == "bold":
+            xlabel = f"\\textbf{{{xlabel}}}"
+        ax.set_xlabel(xlabel, fontsize=xylabelfont)
+        ax.set_title(title, fontweight=fontweight, fontsize=titlefont)
+        if tickfontweight=="bold":
+            ax.set_yticklabels([f"\\textbf{{{i:.0f}}}" for i in ax.get_yticks()], fontsize=tickfont)
+        else:
+            ax.set_yticklabels([f"{i:.0f}" for i in ax.get_yticks()], fontsize=tickfont)
+        #ax.set_yticklabels([f"{round(i, 1):.1f}" for i in ax.get_yticks()], fontsize=tickfont)
+        #ax.set_xticklabels(ax.get_xticks(), fontsize=13)
+        ax.yaxis.grid()
+        ax.xaxis.grid()
+        if legend_cols is None:
+            ax.legend(loc=legend_loc)
+        #Titlepicture:
+        #ax.legend(prop=dict(size=legendfont, weight="bold"), loc=legend_loc, 
+        #          bbox_to_anchor=(1.018, 1.04), frameon=True,
+        #          labelspacing=0.12, handleheight=0.5)
+        if outside_legend:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width*width, box.height])
+            #from matplotlib.legend_handler import HandlerErrorbar
+            leg = ax.legend(loc=legend_loc, ncol=legend_cols, shadow=False,
+                            bbox_to_anchor=(1, 1.05), frameon=False,
+                            prop=dict(size=legendfont),
+                            handles=handle_l,    
+                            #handler_map={type(line): HandlerErrorbar(xerr_size=0.3,
+                            #    markersize=3)},
+                            labelspacing=labelspacing, 
+                            handlelength=handlelength,    
+                            )
+        else:
+            #ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+            #        bbox_to_anchor=(0.5, 1.028), frameon=True,
+            #        labelspacing=0.1, handleheight=0.3, ncol=legend_cols,
+            #        handlelength=1, columnspacing=0.2)
+            #Titlepicture:
+            #ax.legend(prop=dict(size=legendfont), loc=legend_loc, 
+            #        bbox_to_anchor=bbox_to_anchor, frameon=True,
+            #        labelspacing=0.1, ncol=legend_cols, handletextpad=0.4,
+            #        handlelength=1.35, columnspacing=0.2, borderaxespad=0.2,
+            #        borderpad=0.2)
+            ax.legend(prop=dict(size=legendfont), loc="best", 
+                    frameon=True,
+                    labelspacing=labelspacing, ncol=legend_cols, handletextpad=0.4,
+                    handlelength=handlelength, columnspacing=0.2, borderaxespad=0.2,
+                    borderpad=borderpad)
+        fig.set_tight_layout(tight_layout)
         plt.show()
 
     def plot_normal(self, name: str, attack: str, models: List[str], 
@@ -1347,6 +1710,7 @@ class ExperimentManager:
                 label: str=None, title: str=None, ylabel: str=None, budget=None,
                 legend_loc="best", titlefont=20, tickfont=17, xylabelfont=20,
                 legendfont=17, outside_legend=False, width=0.86,
+                handlelength=1.35, labelspacing = 0.1, borderpad=0.2, tickfontweight="bold",
                 K_l: List[float]=[0.1, 0.5, 1, 1.5, 2, 5]):
         """Plot f1 scores to trade of between over- and adv. robustness.
 
@@ -1407,6 +1771,7 @@ class ExperimentManager:
             else:
                 assert False
         # Calculate F1-Score
+        handle_l = []
         for label in Rover_dict:
             if spacing == "even":
                 x = [i for i in range(len(K_l))]
@@ -1423,6 +1788,18 @@ class ExperimentManager:
                 ax.errorbar(x, y, yerr=yerr, marker="o", label=label, capsize=5,
                             color=color, linestyle=linestyle, linewidth=2.5,
                             markersize=8)
+                if linestyle == "--":
+                    linestyle = ":"
+                handle = matplotlib.lines.Line2D([0], [0], linestyle=linestyle, 
+                                          color=color, marker='o', linewidth=2,
+                                          markersize=5,label=label)
+                from matplotlib.container import ErrorbarContainer
+                from matplotlib.collections import LineCollection
+                barline = LineCollection(np.empty((2,2,2)), colors=color)
+                err = ErrorbarContainer((handle, [handle], [barline]), 
+                                         has_xerr=False, has_yerr=True, 
+                                         label=label)
+                handle_l.append(err)
             else:
                 ax.plot(x, y, marker="o", label=label, color=color, 
                         linestyle=linestyle)
@@ -1430,10 +1807,10 @@ class ExperimentManager:
             ylabel=name 
         ax.xaxis.get_major_formatter()._usetex = False
         ax.yaxis.get_major_formatter()._usetex = False
-        ax.set_ylabel("", fontsize=xylabelfont)
-        ax.set_xlabel("K", fontsize=xylabelfont)
+        ax.set_ylabel(ylabel, fontsize=xylabelfont)
+        ax.set_xlabel(r"\textbf{K}", fontsize=xylabelfont)
         ax.set_title(title, fontsize=titlefont)
-        ax.set_yticklabels([f"{round(i, 2):.2f}" for i in ax.get_yticks()], fontsize=tickfont)
+        ax.set_yticklabels([f"\\textbf{{{round(i, 2):.2f}}}" for i in ax.get_yticks()], fontsize=tickfont)
         ax.set_xticklabels(ax.get_xticks(), fontsize=tickfont)
         if title is None:
             title=name
@@ -1444,7 +1821,8 @@ class ExperimentManager:
             ax.set_xticks(xticks, minor=True)
         elif spacing == "even":
             ax.xaxis.set_ticks(x, minor=False)
-            ax.xaxis.set_ticklabels(K_l)
+            xticks = [f"\\textbf{{{K}}}" for K in K_l]
+            ax.xaxis.set_ticklabels(xticks, fontsize=tickfont)
             ax.set_xlim(left=-0.3)
         else:
             ax.set_xticks(K_l, minor=False)
@@ -1453,10 +1831,19 @@ class ExperimentManager:
         ax.yaxis.grid()
         ax.xaxis.grid()
         box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width*0.86, box.height])
+        ax.set_position([box.x0, box.y0, box.width*width, box.height])
+        #leg = ax.legend(loc=legend_loc, ncol=1, shadow=False,
+        #                bbox_to_anchor=(1, 1), frameon=False, markerscale=1,
+        #                prop=dict(size=legendfont))
         leg = ax.legend(loc=legend_loc, ncol=1, shadow=False,
-                        bbox_to_anchor=(1, 1), frameon=False, markerscale=1,
-                        prop=dict(size=legendfont))
+                        bbox_to_anchor=(1, 1.05), frameon=False,
+                        prop=dict(size=legendfont),
+                        handles=handle_l,    
+                        #handler_map={type(line): HandlerErrorbar(xerr_size=0.3,
+                        #    markersize=3)},
+                        labelspacing=labelspacing, 
+                        handlelength=handlelength,    
+                        )
         #leg.get_lines()[0].set_linestyle
         #for i in leg.legendHandles:
         #    i.set_linestyle(":")

@@ -1,5 +1,5 @@
 seml:
-  name: rob_mlp_lp_nettack
+  name: r_gcn_lp
   executable: exp_eval_robustness.py
   project_root_dir: ../../../
   output_dir: log/eval_robustness/
@@ -7,23 +7,22 @@ seml:
 slurm:
   experiments_per_job: 1
   sbatch_options:
-    gres: gpu:1       # num GPUs
+    gres: gpu:1       # num gpu
     mem: 10G          # memory
-    cpus-per-task: 4  # num cores
-    time: 0-16:30     # max time, D-HH:MM
+    cpus-per-task: 1  # num cores
+    time: 0-04:30     # max time, D-HH:MM
 
 fixed:
   model_params:
-    label: MLP+LP
-    model: MLP
+    label: GCN+LP
+    model: DenseGCN
+    n_filters: 64
     use_label_propagation: True
     lp_layers: 50
     lp_alpha: 0.7
     lp_use_clamping: False
 
   data_params:
-    graph_model: CBA
-    m: 2
     inductive_samples: 1000
   
   train_params:
@@ -42,11 +41,12 @@ grid:
     attack: 
       type: choice
       options:
-      #- "l2-weak"
-      #- "random"
       #- "l2"
-      - "nettack"
-      - "nettack_power_law_test"
+      #- "random"
+      #- "l2-weak"
+      #- SGA
+      - GRBCD
+      #- "nettack"
   
   seed:
     type: range
@@ -61,11 +61,10 @@ K01:
 
     model_params:
       dropout: 0.5
-      hidden_channels: 256
 
     train_params:
       lr: 0.1
-      weight_decay: 0.0010
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
@@ -86,18 +85,17 @@ K05:
 
     model_params:
       dropout: 0.5
-      hidden_channels: 256
 
     train_params:
       lr: 0.1
-      weight_decay: 0.0100
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.3
+        dropout: 0.5
       surrogate_train_params:
         lr: 0.1
         weight_decay: 0.0001
@@ -110,12 +108,11 @@ K1:
       K: 1.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 256
+      dropout: 0.5
 
     train_params:
       lr: 0.1
-      weight_decay: 0.0100
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
@@ -135,62 +132,11 @@ K15:
       K: 1.5
 
     model_params:
-      dropout: 0.0
-      hidden_channels: 256
+      dropout: 0.5
 
     train_params:
-      lr: 0.01
-      weight_decay: 0.0001
-
-    attack_params:
-      surrogate_model_params:
-        label: "LinearGCN"
-        model: "LinearGCN"
-        n_filter: 64
-        dropout: 0.5
-      surrogate_train_params:
-        lr: 0.1
-        weight_decay: 0.0100
-        patience: 300
-        max_epochs: 3000
-
-K2:
-  fixed:
-    data_params:
-      K: 2.0
-
-    model_params:
-      dropout: 0.3
-      hidden_channels: 256
-
-    train_params:
-      lr: 0.01
-      weight_decay: 0.0010
-
-    attack_params:
-      surrogate_model_params:
-        label: "LinearGCN"
-        model: "LinearGCN"
-        n_filter: 64
-        dropout: 0.5
-      surrogate_train_params:
-        lr: 0.1
-        weight_decay: 0.0100
-        patience: 300
-        max_epochs: 3000
-
-K3:
-  fixed:
-    data_params:
-      K: 3.0
-
-    model_params:
-      dropout: 0.3
-      hidden_channels: 64
-
-    train_params:
-      lr: 0.10
-      weight_decay: 0.0010
+      lr: 0.1
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
@@ -204,28 +150,75 @@ K3:
         patience: 300
         max_epochs: 3000
 
-K4:
+K2:
   fixed:
     data_params:
-      K: 4.0
+      K: 2.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 256
+      dropout: 0.5
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0001
+      lr: 0.1
+      weight_decay: 0.001
 
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.0
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0001
+        patience: 300
+        max_epochs: 3000
+
+K3:
+  fixed:
+    data_params:
+      K: 3.0
+
+    model_params:
+      dropout: 0.5
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.010
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
       surrogate_train_params:
         lr: 0.1
         weight_decay: 0.0010
+        patience: 300
+        max_epochs: 3000
+
+K4:
+  fixed:
+    data_params:
+      K: 4.0
+
+    model_params:
+      dropout: 0.5
+
+    train_params:
+      lr: 0.1
+      weight_decay: 0.010
+
+    attack_params:
+      surrogate_model_params:
+        label: "LinearGCN"
+        model: "LinearGCN"
+        n_filter: 64
+        dropout: 0.5
+      surrogate_train_params:
+        lr: 0.1
+        weight_decay: 0.0100
         patience: 300
         max_epochs: 3000
 
@@ -235,12 +228,11 @@ K5:
       K: 5.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 256
+      dropout: 0.0
 
     train_params:
-      lr: 0.10
-      weight_decay: 0.0001
+      lr: 0.01
+      weight_decay: 0.010
 
     attack_params:
       surrogate_model_params:

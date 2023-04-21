@@ -1,29 +1,30 @@
 seml:
-  name: rob_mlp_lp_nettack
+  name: r_gat_lp
   executable: exp_eval_robustness.py
   project_root_dir: ../../../
-  output_dir: log/eval_robustness/
+  output_dir: log/eval_robustness
 
 slurm:
   experiments_per_job: 1
   sbatch_options:
-    gres: gpu:1       # num GPUs
+    gres: gpu:1       # num gpu
     mem: 10G          # memory
-    cpus-per-task: 4  # num cores
-    time: 0-16:30     # max time, D-HH:MM
+    cpus-per-task: 1  # num cores
+    time: 0-08:30     # max time, D-HH:MM
 
 fixed:
+
   model_params:
-    label: MLP+LP
-    model: MLP
+    label: GAT+LP
+    model: GAT
+    n_heads: 8
+    n_features_per_head: 8
     use_label_propagation: True
     lp_layers: 50
     lp_alpha: 0.7
     lp_use_clamping: False
 
   data_params:
-    graph_model: CBA
-    m: 2
     inductive_samples: 1000
   
   train_params:
@@ -38,21 +39,30 @@ grid:
       type: choice
       options:
         - 100
-        #- 1000
+        #- 999
     attack: 
       type: choice
       options:
-      #- "l2-weak"
-      #- "random"
       #- "l2"
-      - "nettack"
-      - "nettack_power_law_test"
+      #- "random"
+      #- "l2-weak"
+      #- SGA
+      - GRBCD
+      #- "nettack"
   
   seed:
-    type: range
-    min: 0
-    max: 10
-    step: 1
+    type: choice
+    options:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
 
 K01:
   fixed:
@@ -60,12 +70,12 @@ K01:
       K: 0.1
 
     model_params:
-      dropout: 0.5
-      hidden_channels: 256
+      dropout: 0.0
+      dropout_neighbourhood: 0.6
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.0010
+      lr: 0.10
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
@@ -85,19 +95,19 @@ K05:
       K: 0.5
 
     model_params:
-      dropout: 0.5
-      hidden_channels: 256
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.0100
+      lr: 0.010
+      weight_decay: 0.0001
 
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.3
+        dropout: 0.5
       surrogate_train_params:
         lr: 0.1
         weight_decay: 0.0001
@@ -110,12 +120,12 @@ K1:
       K: 1.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 256
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
 
     train_params:
-      lr: 0.1
-      weight_decay: 0.0100
+      lr: 0.10
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:
@@ -136,10 +146,10 @@ K15:
 
     model_params:
       dropout: 0.0
-      hidden_channels: 256
+      dropout_neighbourhood: 0.6
 
     train_params:
-      lr: 0.01
+      lr: 0.10
       weight_decay: 0.0001
 
     attack_params:
@@ -150,7 +160,7 @@ K15:
         dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0100
+        weight_decay: 0.0001
         patience: 300
         max_epochs: 3000
 
@@ -160,11 +170,11 @@ K2:
       K: 2.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 256
+      dropout: 0.0
+      dropout_neighbourhood: 0.6
 
     train_params:
-      lr: 0.01
+      lr: 0.10
       weight_decay: 0.0010
 
     attack_params:
@@ -175,7 +185,7 @@ K2:
         dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0100
+        weight_decay: 0.0001
         patience: 300
         max_epochs: 3000
 
@@ -185,8 +195,8 @@ K3:
       K: 3.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 64
+      dropout: 0.0
+      dropout_neighbourhood: 0.3
 
     train_params:
       lr: 0.10
@@ -210,22 +220,22 @@ K4:
       K: 4.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 256
+      dropout: 0.0
+      dropout_neighbourhood: 0.6
 
     train_params:
       lr: 0.10
-      weight_decay: 0.0001
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:
         label: "LinearGCN"
         model: "LinearGCN"
         n_filter: 64
-        dropout: 0.0
+        dropout: 0.5
       surrogate_train_params:
         lr: 0.1
-        weight_decay: 0.0010
+        weight_decay: 0.0001
         patience: 300
         max_epochs: 3000
 
@@ -235,12 +245,12 @@ K5:
       K: 5.0
 
     model_params:
-      dropout: 0.3
-      hidden_channels: 256
+      dropout: 0.0
+      dropout_neighbourhood: 0.0
 
     train_params:
       lr: 0.10
-      weight_decay: 0.0001
+      weight_decay: 0.0010
 
     attack_params:
       surrogate_model_params:

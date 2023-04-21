@@ -14,7 +14,7 @@ slurm:
 
 fixed:
   model_params:
-    label: MLP
+    label: MLP+LP
     model: MLP
     use_label_propagation: True
     lp_layers: 50

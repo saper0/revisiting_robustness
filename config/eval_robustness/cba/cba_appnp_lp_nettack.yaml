@@ -15,7 +15,7 @@ slurm:
 fixed:
 
   model_params:
-    label: APPNP
+    label: APPNP+LP
     model: APPNP
     n_hidden: 64
     K: 10

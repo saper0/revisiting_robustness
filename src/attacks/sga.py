@@ -209,7 +209,7 @@ class SGAttack:
                 max_feature_grad, max_feature_idx = torch.max(features_grad.view(-1), dim=0)
                 max_feature_score = max_feature_grad.item()
 
-            if max_structure_score >= max_feature_score:
+            if max_structure_score >= max_feature_score or not self.attack_features:
                 if max_edge_grad > max_non_edge_grad:
                     # remove one edge
                     best_edge = subgraph.edge_index[:, max_edge_idx]

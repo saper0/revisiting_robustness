@@ -15,7 +15,7 @@ slurm:
 fixed:
 
   model_params:
-    label: GAT
+    label: GAT+LP
     model: GAT
     n_heads: 8
     n_features_per_head: 8
