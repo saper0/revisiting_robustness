@@ -4,7 +4,7 @@ This codebase has been used to generate all results found in the ICLR 2023 paper
 
 The following instructions refer to the codebase found in the [src](src/) folder and have been used to generate all results pertaining random graph models (contextual stochastic block models / contextual Barabási-Albert models with community structure).
 
-The codebase for the real world experiments including a separate installation and usage description can be found in the folder [real_graphs](real_graphs/).
+The codebase for the experiments on real graphs with a separate installation and usage description can be found in the folder [real_graphs](real_graphs/).
 
 # Installation
 
