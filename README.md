@@ -55,6 +55,26 @@ again, optionally adding the `--local` flag.
 
 Individually configured experiments can also be run without using the *seml* command-line interface and without requiring a MongoDB using the provided [exp.ipynb](exp.ipynb). 
 
+# Cite
+
+Please cite our paper if you use this code in your own work:
+
+```
+@inproceedings{
+    gosch2023revisiting,
+    title={Revisiting Robustness in Graph Machine Learning},
+    author={Lukas Gosch and Daniel Sturm and Simon Geisler and Stephan G{\"u}nnemann},
+    booktitle={The Eleventh International Conference on Learning Representations (ICLR)},
+    year={2023},
+}
+```
+
+# Contact
+
+For questions and feedback, please do not hesitate to contact:
+
+Lukas Gosch, gosch.lukas (at) tum.de, Technical University of Munich
+
 # Other Notes
 
 This codebase contains code snippets from the following repositories:

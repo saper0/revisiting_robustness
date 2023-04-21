@@ -5,8 +5,6 @@ import torch.nn as nn
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 
-from src.models import LP
-
 
 patch_typeguard()
 

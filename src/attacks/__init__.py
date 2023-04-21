@@ -6,12 +6,11 @@ import torch.nn as nn
 
 from src.attacks.simple_attack import SimpleAttack
 from src.attacks.nettack import Nettack
-from src.attacks.nettack_adapted import NettackAdapted
 from src.attacks.sga import SGA
 from src.attacks.rbcd import RBCDWrapper
 from src.models.lp import LP
 
-ATTACK_TYPE = [SimpleAttack, Nettack, NettackAdapted, RBCDWrapper, SGA]
+ATTACK_TYPE = [SimpleAttack, Nettack, RBCDWrapper, SGA]
 
 def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
                   hyperparams: Dict[str, Any], 
@@ -54,12 +53,9 @@ def create_attack(target_idx: int, X: np.ndarray, A: np.ndarray, y: np.ndarray,
         return SGA(target_idx, X, A, y, surrogate_model,
                    n_perturbations=hyperparams["max_robustness"],
                    device=device)
-    if hyperparams["attack"] == "nettack-adapted":
-        return NettackAdapted(hyperparams["attack"], target_idx, X, A, y, 
-                              model, label_prop, device)
     if hyperparams["attack"] in ["PRBCD", "GRBCD"]:
         return RBCDWrapper(hyperparams["attack"], target_idx, X, A, y,  model)
     raise ValueError("Specified attack not found.")
 
-__all__ = [SimpleAttack, Nettack, NettackAdapted, RBCDWrapper, SGA,
+__all__ = [SimpleAttack, Nettack, RBCDWrapper, SGA,
            ATTACK_TYPE, create_attack]

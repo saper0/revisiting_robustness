@@ -41,7 +41,7 @@ grid:
       type: choice
       options:
         - 100
-        #- 999
+        #- 1000
     attack: 
       type: choice
       options:

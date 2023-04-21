@@ -1,3 +1,6 @@
+# The code in this source file has been taken from PyTorch Geometric and 
+# adapted for this work: https://github.com/pyg-team/pytorch_geometric
+
 from typing import Optional, Tuple, Union
 
 from torch import nn

@@ -1,3 +1,7 @@
+# This file has been mostly taken from the work bei Geisler et al. 
+# "Robustness of Graph Neural Networks at Scale" (NeurIPS, 2021)
+# Link: https://github.com/sigeisler/robustness_of_gnns_at_scale
+
 from typing import Tuple, Union
 
 import torch

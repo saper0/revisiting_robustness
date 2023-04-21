@@ -7,12 +7,10 @@ seml:
 slurm:
   experiments_per_job: 1
   sbatch_options:
-    qos: phdcpu      
-    partition: cpu
-    gres: gpu:0       # num gpu
+    gres: gpu:1       # num GPUs
     mem: 10G          # memory
-    cpus-per-task: 1  # num cores
-    time: 0-04:30     # max time, D-HH:MM
+    cpus-per-task: 4  # num cores
+    time: 0-08:30     # max time, D-HH:MM
 
 fixed:
   model_params:
@@ -39,16 +37,15 @@ grid:
     max_robustness:
       type: choice
       options:
-        - 100
-        #- 1000
+        - 999
     attack: 
       type: choice
       options:
-      #- "l2"
-      #- "random"
-      #- "l2-weak"
+      - "l2"
+      - "random"
+      - "l2-weak"
       - SGA
-      #- "nettack"
+      - "nettack"
   
   seed:
     type: range

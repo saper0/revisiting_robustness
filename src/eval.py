@@ -1,3 +1,4 @@
+"""(Semantic-Aware) Robustness evaluation module. """
 from collections import Counter
 from typing import Any, Dict, Optional, Union
 
@@ -29,7 +30,7 @@ def evaluate_robustness(model: Optional[nn.Module],
     given graph generated from a specific generative graph model. Robustness
     metrics are calculated over repeated sampling of an additional node in an
     inductive manner and include:
-        - General Robustness to edge insertions
+        - General Robustness to edge insertions / deletions
         - Robustness w.r.t. Bayes Classifier
 
     Args:
@@ -110,12 +111,12 @@ def evaluate_robustness(model: Optional[nn.Module],
     if "max_robustness" in attack_params:
         max_robustness = attack_params["max_robustness"]
     else:
-        # Nettack (or any other attack) had possibility to remove all same-class and add all different-class edges
+        # Nettack (or any other attack) get possibility to remove all 
+        # same-class and add all different-class edges
         max_robustness = y_np.size
     if model is not None:
         model.eval()
     for i in tqdm(range(inductive_samples)):
-        # ToDo: Create empty X, A, y templates & always only fill last row
         X, A, y = graph_model.sample_conditional(1, X_np, A_np, y_np)
         deg_n = str(np.sum(A[:,n]))
         c_degree_total[deg_n] += 1
@@ -169,23 +170,18 @@ def evaluate_robustness(model: Optional[nn.Module],
             gnn_wrt_bayes_setting = True
         attack = create_attack(n, X, A, y, attack_params, surrogate_model, 
                                model, label_prop, device)
-        #print(f"Deg: {deg_n}; true_class: {y[n]}")
         while bayes_separable or gnn_separable:
-            #print(f"{c_robustness}: Bayes_sep: {bayes_separable}; GNN_sep: {gnn_separable}")
             adv_edge = attack.create_adversarial_pert()
             if c_robustness >= max_robustness:
                 adv_edge = None
             if adv_edge is not None:
                 u, v = adv_edge
-                #d = np.linalg.norm(X[u, :] - X[v, :])
                 if A_gpu[u, v] == 1:
-                    #print(f"Edge Removed: ({u}, {v}); Classes: ({y[u]}, {y[v]}), Feature Distance: {d:.3f}")
                     A_gpu[u, v] = 0
                     A_gpu[v, u] = 0
                     A[u, v] = 0 #simple attacks update A, nettack not
                     A[v, u] = 0
                 else:
-                    #print(f"Edge Added: ({u}, {v}); Classes: ({y[u]}, {y[v]}), Feature Distance: {d:.3f}")
                     A_gpu[u, v] = 1
                     A_gpu[v, u] = 1
                     A[u, v] = 1
@@ -348,11 +344,11 @@ def evaluate_robustness(model: Optional[nn.Module],
                 sem_gnn_robust_when_both=sem_gnn_robust_when_both, 
                 max_gnn_robust_when_both=max_gnn_robust_when_both,
                 # Raw Degree-Dependent Robustness Data (For each Node)
-                c_bayes_robust=c_bayes_robust, #g|y
-                c_gnn_robust=c_gnn_robust, #f|y
-                c_gnn_wrt_bayes_robust=c_gnn_wrt_bayes_robust, # f|g
-                c_bayes_robust_when_both=c_bayes_robust_when_both, #g|y when g & f both correctly classified node
-                c_gnn_robust_when_both=c_gnn_robust_when_both, #f|y when g & f both correctly classified node
+                c_bayes_robust=c_bayes_robust, #Robustness counts of g w.r.t. y
+                c_gnn_robust=c_gnn_robust, #Robustness counts of f w.r.t. y
+                c_gnn_wrt_bayes_robust=c_gnn_wrt_bayes_robust, #Robustness counts of f w.r.t. g
+                c_bayes_robust_when_both=c_bayes_robust_when_both, #Robustness counts of g w.r.t. y when g & f both correctly classified node
+                c_gnn_robust_when_both=c_gnn_robust_when_both, #Robustness counts of f w.r.t. y when g & f both correctly classified node
                 c_degree_total = dict(c_degree_total)
             )
     )

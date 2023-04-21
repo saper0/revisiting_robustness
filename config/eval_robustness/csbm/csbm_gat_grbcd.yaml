@@ -7,9 +7,9 @@ seml:
 slurm:
   experiments_per_job: 1
   sbatch_options:
-    gres: gpu:1       # num gpu
+    gres: gpu:1       # num GPUs
     mem: 10G          # memory
-    cpus-per-task: 1  # num cores
+    cpus-per-task: 4  # num cores
     time: 0-08:30     # max time, D-HH:MM
 
 fixed:
@@ -35,16 +35,10 @@ grid:
       type: choice
       options:
         - 100
-        #- 999
     attack: 
       type: choice
       options:
-      #- "l2"
-      #- "random"
-      #- "l2-weak"
-      #- SGA
       - GRBCD
-      #- "nettack"
   
   seed:
     type: choice

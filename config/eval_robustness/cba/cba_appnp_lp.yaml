@@ -40,7 +40,6 @@ grid:
     max_robustness:
       type: choice
       options:
-        #- 100
         - 1000
     attack: 
       type: choice

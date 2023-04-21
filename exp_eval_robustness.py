@@ -1,3 +1,9 @@
+"""
+Given GNN and attack hyperparameters, this experiment trains a GNN on a 
+random graph model and evaluates is (semanti-aware) robustness incl. over-
+robustness.
+"""
+
 import logging
 from typing import Any, Dict, Union, Optional
 
@@ -246,8 +252,6 @@ def run(data_params: Dict[str, Any],
                             n_features=X_np.shape[1], 
                             n_classes=data_params["classes"])
     
-    #not_trained = True
-    #while not_trained:
     model = create_model(model_params_trn)
     if model is not None:
         model = model.to(device)
@@ -275,10 +279,6 @@ def run(data_params: Dict[str, Any],
         lp_in_training = label_prop
     train_tracker = train(model, lp_in_training, X, A, y, split_trn, split_val, 
                         train_params, verbosity_params, _run)
-    #if train_tracker.get_best_epoch() == 1 and lp_in_training is None:
-    #    logging.info("Model did not train, re-initialize model.")
-    #else:
-    #    not_trained = False
 
     if label_prop is not None:
         logging.info("Testing Trained Model + Label Propagation:")
@@ -309,7 +309,7 @@ def run(data_params: Dict[str, Any],
                                        surrogate_model,
                                        device)
 
-    # (Optional) Logging of Robusntess Statistics
+    # (Optional) Logging of Robustness Statistics
     log_prediction_statistics(**results_dict["prediction_statistics"])
     robustness_statistics = results_dict["robustness_statistics"]
     log_robust_statistics(

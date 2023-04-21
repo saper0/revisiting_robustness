@@ -39,16 +39,10 @@ grid:
       type: choice
       options:
         - 100
-        #- 999
     attack: 
       type: choice
       options:
-      #- "l2"
-      #- "random"
-      #- "l2-weak"
-      #- SGA
       - GRBCD
-      #- "nettack"
   
   seed:
     type: choice
