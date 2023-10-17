@@ -39,7 +39,11 @@ Exemplary, the corresponding configuration file for the GCN+LP architecture is `
 seml [mongodb-collection-name] add config/eval_robustness/csbm_gcn_lp.yaml start
 ```
 
-again, optionally adding the `--local` flag. 
+Optionally, the experiments can be run locally by adding the `--local` flag. 
+
+```
+seml [mongodb-collection-name] add config/eval_robustness/csbm_gcn_lp.yaml start --local
+```
 
 Individually configured experiments can also be run without using the *seml* command-line interface and without requiring a MongoDB using the provided [exp.ipynb](exp.ipynb). 
 
@@ -53,12 +57,7 @@ Exemplary, the corresponding configuration file for the GCN architecture is `csb
 seml [mongodb-collection-name] add config/training/csbm_gcn.yaml start
 ```
 
-Optionally, the experiments can be run locally by adding the `--local` flag:
-
-```
-seml [mongodb-collection-name] add config/training/csbm_gcn.yaml start --local
-```
-
+again, optionally, the experiments can be run locally by adding the `--local` flag.
 
 # Cite
 
