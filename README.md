@@ -31,7 +31,7 @@ All experiments have been conducted using [seml](https://github.com/TUM-DAML/sem
 
 ## Analysing (Over-) Robustness
 
-The code in `exp_eval_robustness.py` trains a models with the provided hyperparameters and then, analysis its classic as well as semantic-aware robustness. The corresponding *seml* experiment configuration files can be found in [config/eval_robustness](config/eval_robustness/). 
+The code in `exp_eval_robustness.py` trains a models with the provided hyperparameters and then, analyzes its classic as well as semantic-aware robustness. The corresponding *seml* experiment configuration files can be found in [config/eval_robustness](config/eval_robustness/). 
 
 Exemplary, the corresponding configuration file for the GCN+LP architecture is `csbm_gcn_lp.yaml`. It can be run by executing
 
