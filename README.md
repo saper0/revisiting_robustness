@@ -27,7 +27,7 @@ pytest 7.0.0 (optional: only for performing unit tests)
 
 # Experiments
 
-All experiments use [seml](https://github.com/TUM-DAML/seml). For an introduction into *seml*, we refer to the [official examples](https://github.com/TUM-DAML/seml/tree/master/examples) on the *seml* github repository. 
+All experiments use [seml](https://github.com/TUM-DAML/seml). For an introduction into *seml*, we refer to the [official examples](https://github.com/TUM-DAML/seml/tree/master/examples) on the *seml* github repository. Individually configured experiments can also be run without using the *seml* command-line interface and without requiring a MongoDB using the provided [exp.ipynb](exp.ipynb).  
 
 ## Analysing (Over-) Robustness
 
@@ -45,7 +45,7 @@ Optionally, the experiments can be run locally by adding the `--local` flag.
 seml [mongodb-collection-name] add config/eval_robustness/csbm_gcn_lp.yaml start --local
 ```
 
-Individually configured experiments can also be run without using the *seml* command-line interface and without requiring a MongoDB using the provided [exp.ipynb](exp.ipynb). 
+As mentioned above, individually configured experiments can be run without using *seml* and a MongoDB as shown in [exp.ipynb](exp.ipynb) (note: the only requirement is that the *seml* package is installed). 
 
 ## Hyperparameter Search
 
