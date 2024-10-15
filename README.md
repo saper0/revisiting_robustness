@@ -27,7 +27,7 @@ pytest 7.0.0 (optional: only for performing unit tests)
 
 # Experiments
 
-All experiments use [seml](https://github.com/TUM-DAML/seml). For an introduction into *seml*, we refer to the [official examples](https://github.com/TUM-DAML/seml/tree/master/examples) on the *seml* github repository. Individually configured experiments can also be run without using the *seml* command-line interface and without requiring a MongoDB using the provided [exp.ipynb](exp.ipynb).  
+All experiments have been conducted using [seml](https://github.com/TUM-DAML/seml). For an introduction into *seml*, we refer to the [official examples](https://github.com/TUM-DAML/seml/tree/master/examples) on the *seml* github repository. Individually configured experiments can also be run without using the *seml* command-line interface and without requiring a MongoDB using the provided [exp.ipynb](exp.ipynb).  
 
 ## Analysing (Over-) Robustness
 
